@@ -1,5 +1,10 @@
-## Hi there 👋
+## Hello, I'm Vuthy (Pronounced Vu-Tee!) and welcome to my portfolio! 
 
+I'm a data analyst with experience in data collecting, analysing and reporting with experiences in databases.
+
+Thank you for checking out my portfolio, from here is where I will be showcasing some personal projects I have developed to showcase.
+
+I welcome any work opportunities where I may further hone my skills.
 <!--
 **vuthyM/vuthyM** is a ✨ _special_ ✨ repository because its `README.md` (this file) appears on your GitHub profile.
 

@@ -33,7 +33,8 @@ async function demo(w = 1360, h = 900) {
 const W = pg => pg.evaluate(() => window.__dmforge.S.working.list().map(e => e.kind + ':' + e.path));
 const vaultHas = (pg, p) => pg.evaluate(p => window.__dmforge.S.vault.exists(p), p);
 const vaultText = (pg, p) => pg.evaluate(p => window.__dmforge.S.vault.readText(p), p);
-const layout = async (pg, name) => { await pg.click('#layoutBtn'); await pg.click('.ctx-item:has-text("' + name + '")'); await pg.waitForFunction(() => !document.querySelector('.ctx')); };
+const LAYOUT_ID = { 'Single pane': '#viewLayout-single', 'Two columns': '#viewLayout-two', 'Prep and two panes': '#viewLayout-prep', 'Table mode': '#viewTable' };
+const layout = async (pg, name) => { await pg.click('#viewMenu'); await pg.click(LAYOUT_ID[name]); await pg.waitForFunction(() => !document.querySelector('.popmenu-pop:not([hidden])')); };
 const push = async pg => { await pg.click('#pushBtn'); await pg.waitForSelector('#confirmPush'); await pg.click('#confirmPush'); await pg.waitForSelector('#pushDone'); await pg.click('#pushDone'); };
 
 /* ================= 1. push review: Push button stays reachable, no content ================= */
@@ -646,6 +647,7 @@ for (const width of [1000, 1360, 1800, 860]) {
 {
   const pg = await demo();
   await pg.click('.nav-btn:has-text("Sessions")');
+  if (await pg.locator('.pane:not([hidden]) #backToList').count()) await pg.click('.pane:not([hidden]) #backToList');
   await pg.click('.btn-primary:has-text("New Session")');
   await pg.waitForSelector('.modal input[type=date]');
   check('the number is predicted from the folder (2 sessions, highest 12)', (await pg.inputValue('.modal input[type=number]')) === '13', await pg.inputValue('.modal input[type=number]'));
@@ -657,9 +659,10 @@ for (const width of [1000, 1360, 1800, 860]) {
   check('the file name has no date: "Session 13 - The Three Rings"', made.path === 'Ashfall/Sessions/Session 13 - The Three Rings.md', made.path);
   check('the date picked is kept in the note\'s properties', /\ndate: 2026-11-01\n/.test(made.text) && /\nnumber: 13\n/.test(made.text), made.text);
   check('the heading has no date either', made.text.includes('# Session 13: The Three Rings') && !made.text.includes('2026-11-01 Session'));
-  check('the title shown on the page is just the session name, with the date underneath', (await pg.textContent('.pane:not([hidden]) .note-head h2')).trim() === 'Session 13 - The Three Rings' && (await pg.textContent('.pane:not([hidden]) .list-item[aria-current="true"]')).includes('2026-11-01'), await pg.textContent('.pane:not([hidden]) .note-head h2'));
+  check('the title shown on the page is just the session name, with the date underneath', (await pg.textContent('.pane:not([hidden]) .note-head h2')).trim() === 'Session 13 - The Three Rings' && (await pg.textContent('.pane:not([hidden]) .sp-sub')).includes('2026-11-01'), await pg.textContent('.pane:not([hidden]) .note-head h2'));
   check('the page does not repeat the title as a heading', !(await pg.textContent('.pane:not([hidden]) .md')).includes('Session 13: The Three Rings'));
   // with no title, and the newest session is listed first by its date
+  if (await pg.locator('.pane:not([hidden]) #backToList').count()) await pg.click('.pane:not([hidden]) #backToList');
   await pg.click('.btn-primary:has-text("New Session")');
   await pg.waitForSelector('.modal input[type=date]');
   check('and it moves on after each new session', (await pg.inputValue('.modal input[type=number]')) === '14', await pg.inputValue('.modal input[type=number]'));
@@ -669,6 +672,7 @@ for (const width of [1000, 1360, 1800, 860]) {
   await pg.click('.modal button[type=submit]');
   await pg.waitForFunction(() => window.__dmforge.S.working.list().some(e => e.path === 'Ashfall/Sessions/Episode 14.md'));
   check('without a title it is just "Episode 14", and its heading says so too', (await pg.evaluate(() => window.__dmforge.S.working.get('Ashfall/Sessions/Episode 14.md'))).includes('# Episode 14\n'));
+  if (await pg.locator('.pane:not([hidden]) #backToList').count()) await pg.click('.pane:not([hidden]) #backToList');
   await pg.click('.btn-primary:has-text("New Session")');
   await pg.waitForSelector('#nsWord');
   check('the word you chose is remembered for next time', (await pg.inputValue('#nsWord')) === 'Episode');
@@ -743,9 +747,9 @@ for (const width of [1000, 1360, 1800, 860]) {
   const attr = pg => pg.evaluate(() => document.documentElement.getAttribute('data-theme'));
   let pg = await demo();                      // the test browser prefers light
   check('follows the system when you have not chosen (light here)', (await attr(pg)) === null && (await bg(pg)) === 'rgb(239, 236, 226)', await bg(pg));
-  check('the toggle is in the top bar', await pg.locator('.topbar #themeToggle').count() === 1);
+  check('light and dark are in the View menu in the top bar', await pg.locator('.topbar #viewMenu').count() === 1 && await pg.locator('#viewTheme-dark').count() === 1 && await pg.locator('.topbar #themeToggle').count() === 0);
   const t0 = Date.now();
-  await pg.click('#themeToggle');
+  await pg.click('#viewMenu'); await pg.click('#viewTheme-dark');
   check('the switch is instant to start (the page is not frozen)', Date.now() - t0 < 500, String(Date.now() - t0));
   const frames = await pg.evaluate(() => new Promise(res => { const f = []; let last = performance.now(); const t = n => { f.push(n - last); last = n; if (f.length < 120) requestAnimationFrame(t); else res(Math.max(...f)); }; requestAnimationFrame(t); }));
   check('no frame stalls while it fades (worst frame under 200ms)', frames < 200, String(frames));
@@ -755,7 +759,7 @@ for (const width of [1000, 1360, 1800, 860]) {
   await pg.waitForTimeout(Math.max(0, 900 - (Date.now() - t0)));
   check('shortly after, dark mode has fully arrived', (await bg(pg)) === 'rgb(24, 23, 20)', await bg(pg));
   check('the setting itself changed straight away', (await attr(pg)) === 'dark');
-  check('the button reports dark', (await pg.getAttribute('#themeToggle', 'aria-pressed')) === 'true');
+  check('the View menu ticks dark', (await pg.getAttribute('#viewTheme-dark', 'aria-checked')) === 'true');
   check('the choice is stored', (await pg.evaluate(() => localStorage.getItem('dmforge:theme'))) === 'dark');
   if (shots) await pg.screenshot({ path: shots + '/theme-dark.png' });
   await pg.reload();
@@ -851,13 +855,13 @@ for (const width of [1000, 1360, 1800, 860]) {
   const pg = await demo(1360, 700);
   await pg.evaluate(() => {
     const { S, touch } = window.__dmforge;
-    for (let i = 0; i < 40; i++) S.working.create('Ashfall/Sessions/Episode ' + (20 + i) + '.md', '---\ntype: session\nnumber: ' + (20 + i) + '\n---\n# Episode ' + (20 + i) + '\n\nText\n');
-    const p = 'Ashfall/Sessions/2026-10-12 Session 12.md';
-    S.working.setText(p, S.working.get(p) + '\n' + Array.from({ length: 120 }, (_, i) => 'Long line number ' + i + ' of the session notes.').join('\n\n') + '\n');
+    for (let i = 0; i < 40; i++) S.working.create('Ashfall/NPCs/Extra Person ' + (20 + i) + '.md', '---\ntype: npc\n---\n# Extra Person ' + (20 + i) + '\n\nText\n');
+    const p = 'Ashfall/NPCs/Archmage Vaelith.md';
+    S.working.setText(p, S.working.get(p) + '\n' + Array.from({ length: 120 }, (_, i) => 'Long line number ' + i + ' of the notes.').join('\n\n') + '\n');
     touch();
   });
-  await pg.click('.nav-btn:has-text("Sessions")');
-  await pg.click('.pane:not([hidden]) .list-item:has-text("Session 12")');
+  await pg.click('.nav-btn:has-text("NPCs")');
+  await pg.click('.pane:not([hidden]) .list-item:has-text("Archmage Vaelith")');
   await pg.waitForSelector('.pane:not([hidden]) .note-head');
   const cols = () => pg.evaluate(() => {
     const sp = document.querySelector('.pane:not([hidden]) .scroll-split');
@@ -1133,6 +1137,7 @@ for (const width of [1000, 1360, 1800, 860]) {
   // picking another session from the list saves too
   await pg.click('.pane:not([hidden]) .note-head button:text-is("Edit")');
   await pg.fill(body, (await pg.inputValue(body)) + '\n\nAUTO-SAVED LINE two');
+  await pg.click('.pane:not([hidden]) #backToList');
   await pg.click('.pane:not([hidden]) .list-item:has-text("Session 11")');
   await pg.waitForFunction(() => document.querySelector('.pane:not([hidden]) .note-head h2').textContent.includes('Session 11'));
   check('choosing another note in the list saves too', (await get()).includes('AUTO-SAVED LINE two'));
@@ -1221,13 +1226,13 @@ for (const width of [1000, 1360, 1800, 860]) {
   const head = p => pg.$$eval('.pane[data-pane="' + p + '"]:not([hidden]) h2', els => els.map(e => e.textContent).join(' / '));
   await pg.click('.nav-btn:has-text("Sessions")');
   await pg.click('.pane:not([hidden]) .list-item:has-text("Session 12")');
-  check('the Layout button is in the top bar', await pg.locator('.topbar #layoutBtn').count() === 1);
+  check('the layouts are in the View menu in the top bar', await pg.locator('.topbar #viewMenu').count() === 1 && await pg.locator('#viewLayout-single').count() === 1);
   check('with Claude off there is no Snapshot button in the top bar (or it says why it is off)', await pg.locator('.topbar #snapBtn').count() === 0 || (await pg.isDisabled('#snapBtn') && (await pg.getAttribute('#snapBtn', 'title')).includes('Switch on Claude')));
-  await pg.click('#layoutBtn');
-  await pg.waitForSelector('.ctx');
-  const items = await pg.$$eval('.ctx-item', els => els.map(e => e.textContent));
-  check('it offers Single pane, Two columns, Prep and two panes and Table mode, ticking the current one', items.length === 4 && items[0].startsWith('✓') && items[1].includes('Two columns') && items[2].includes('Prep and two panes') && items[3].includes('Table mode'), items.join(' | '));
-  await pg.click('.ctx-item:has-text("Prep and two panes")');
+  await pg.click('#viewMenu');
+  await pg.waitForSelector('#viewLayout-single', { state: 'attached' });
+  const items = await pg.$$eval('#viewMenu ~ .popmenu-pop [id^="viewLayout-"], #viewMenu ~ .popmenu-pop #viewTable', els => els.map(e => e.textContent));
+  check('it offers Single pane, Two columns, Prep and two panes and Table mode, ticking the current one', items.length === 4 && items[0].startsWith('✓') && items[1].includes('Two columns') && items[2].includes('Prep and two panes') && items[3].includes('Table mode'), JSON.stringify(items));
+  await pg.click('#viewLayout-prep');
   await pg.waitForFunction(() => document.querySelectorAll('.tabbar').length === 3);
   const boxes = await pg.$$eval('.pane:not([hidden])', ps => ps.map(p => { const r = p.getBoundingClientRect(); return { p: p.dataset.pane, x: Math.round(r.x), y: Math.round(r.y), w: Math.round(r.width), h: Math.round(r.height) }; }).sort((a, b) => a.p - b.p));
   check('three panes, each with its own row of tabs', boxes.length === 3 && (await pg.locator('.tabbar').count()) === 3);
@@ -1238,7 +1243,7 @@ for (const width of [1000, 1360, 1800, 860]) {
     return { top: Math.round(sp.top - first.top), bottom: Math.round(ws.bottom - sp.bottom), colour: getComputedStyle(document.querySelector('.splitter-cols'), '::before').backgroundColor, borders: [...document.querySelectorAll('.pane:not([hidden])')].map(p => getComputedStyle(p).borderLeftWidth) };
   });
   check('the divider between left and right is one unbroken line from the tab rows to the bottom, not pieces of each pane', Math.abs(line.top) <= 1 && Math.abs(line.bottom) <= 1 && line.colour !== 'rgba(0, 0, 0, 0)' && line.borders.every(w => w === '0px'), JSON.stringify(line));
-  check('a pane this narrow gives the open note its whole width and hides the list', (await pg.locator('.pane[data-pane="0"] .scroll-split > :first-child').isHidden()) && (await pg.locator('.pane[data-pane="0"] #backToList').isVisible()));
+  check('an open session gives the note the whole width, with the list one click away', (await pg.locator('.pane[data-pane="0"] .scroll-split .list').count()) === 0 && (await pg.locator('.pane[data-pane="0"] .session-page').isVisible()) && (await pg.locator('.pane[data-pane="0"] #backToList').isVisible()));
   await pg.click('.pane[data-pane="0"] #backToList');
   check('"All sessions" brings the list back', (await pg.locator('.pane[data-pane="0"] .scroll-split > :first-child').isVisible()) && (await pg.locator('.pane[data-pane="0"] .note-head').count()) === 0);
   await pg.click('.pane[data-pane="0"] .list-item:has-text("Session 12")');
@@ -1320,7 +1325,7 @@ for (const width of [1000, 1360, 1800, 860]) {
   // narrow windows show one pane
   await pg.setViewportSize({ width: 800, height: 700 });
   await pg.waitForTimeout(300);
-  check('a narrow window shows one row of tabs and one pane, and the Layout button is off', (await pg.locator('.tabbar').count()) === 1 && (await pg.locator('.pane:not([hidden])').count()) === 1 && await pg.isDisabled('#layoutBtn'));
+  check('a narrow window shows one row of tabs and one pane, and the Layout button is off', (await pg.locator('.tabbar').count()) === 1 && (await pg.locator('.pane:not([hidden])').count()) === 1 && await pg.isDisabled('#viewLayout-two'));
   await pg.setViewportSize({ width: 1500, height: 900 });
   await pg.waitForTimeout(300);
   check('and the two panes come back when the window is wide again', (await pg.locator('.tabbar').count()) === 2);
@@ -1386,7 +1391,7 @@ for (const width of [1000, 1360, 1800, 860]) {
   check('and the tab changes page in place again', t.length === n0 && t[0].title === 'Factions', JSON.stringify(t));
   // panes: a pinned tab in a pane makes new tabs in that same pane
   await pg.click('.tabbar .tab >> nth=0', { button: 'right' }); await pg.click('.ctx-item:has-text("Pin")');
-  await pg.click('#layoutBtn'); await pg.click('.ctx-item:has-text("Prep and two panes")');
+  await pg.click('#viewMenu'); await pg.click('#viewLayout-prep');
   await pg.waitForFunction(() => document.querySelectorAll('.tabbar').length === 3);
   await pg.click('.pane[data-pane="0"] .page-head h2');
   const inPane0 = await pg.locator('.tabbar[data-pane="0"] .tab').count();
@@ -1408,9 +1413,10 @@ for (const width of [1000, 1360, 1800, 860]) {
 {
   const pg = await demo();
   const panel = '#cheatPanel';
-  // the button, right of the search bar
-  const bx = await pg.evaluate(() => { const a = document.querySelector('.search-wrap').getBoundingClientRect(), c = document.querySelector('#cheatBtn').getBoundingClientRect(); return { sameRow: Math.abs(a.top - c.top) < 30, right: c.left >= a.right - 1 }; });
-  check('there is a Cheat sheet button, right of the search bar', bx.sameRow && bx.right, JSON.stringify(bx));
+  // the cheat sheet is in the View menu, right of the search bar
+  const bx = await pg.evaluate(() => { const a = document.querySelector('.search-wrap').getBoundingClientRect(), c = document.querySelector('#viewMenu').getBoundingClientRect(); return { sameRow: Math.abs(a.top - c.top) < 30, right: c.left >= a.right - 1, inMenu: !!document.querySelector('#viewMenu ~ .popmenu-pop #cheatBtn') }; });
+  check('there is a Cheat sheet in the View menu, right of the search bar', bx.sameRow && bx.right && bx.inMenu, JSON.stringify(bx));
+  await pg.click('#viewMenu');
   await pg.click('#cheatBtn');
   await pg.waitForSelector(panel);
   await pg.waitForTimeout(350);

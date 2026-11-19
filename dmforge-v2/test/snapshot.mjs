@@ -83,8 +83,8 @@ const npcPaths = await pg.evaluate(() => window.__dmforge.S.working.paths().filt
 const sessionPath = await pg.evaluate(() => window.__dmforge.S.working.paths().find(p => /\/Sessions\/.+\.md$/.test(p)));
 
 // 1. before there is one
-const sb = await pg.evaluate(() => { const b = document.querySelector('#snapBtn'), l = document.querySelector('#layoutBtn'); if (!b) return null; const a = b.getBoundingClientRect(), c = l.getBoundingClientRect(); return { text: b.textContent.trim(), title: b.title, disabled: b.disabled, dot: !!b.querySelector('.snap-dot'), sameRow: Math.abs(a.top - c.top) < 20, left: a.right <= c.left + 1 }; });
-check('the top bar always has a Snapshot button, just left of Layout, usable with Claude on', !!sb && sb.text === 'Snapshot' && !sb.disabled && sb.sameRow && sb.left, JSON.stringify(sb));
+const sb = await pg.evaluate(() => { const b = document.querySelector('#snapBtn'), l = document.querySelector('#viewMenu'); if (!b) return null; return { text: b.textContent.trim(), title: b.title, disabled: b.disabled, dot: !!b.querySelector('.snap-dot'), inMenu: !!b.closest('.popmenu-pop') && !!l.parentElement.contains(b) }; });
+check('the View menu in the top bar has a Snapshot item, usable with Claude on', !!sb && /^Snapshot of the campaign/.test(sb.text) && !sb.disabled && sb.inMenu, JSON.stringify(sb));
 check('and it says there is no snapshot yet, with no dot', !!sb && sb.title.includes('No snapshot yet') && !sb.dot);
 await pg.click('#snapBtn');
 await pg.waitForSelector('#snapFacts');
@@ -111,8 +111,8 @@ const before = nCalls();
 await pg.click('#snapSend');
 await pg.waitForFunction(() => !document.querySelector('.modal'));
 await pg.waitForSelector('#jobPill');
-const pill = await pg.evaluate(() => { const a = document.querySelector('#jobPill').getBoundingClientRect(), l = document.querySelector('#layoutBtn').getBoundingClientRect(); return { sameRow: Math.abs(a.top - l.top) < 20, left: a.right <= l.left + 1, spinner: !!document.querySelector('#jobPill .spinner'), text: document.querySelector('#jobPill').textContent }; });
-check('Send closes the window and the work carries on in the background: a pill with a spinner appears in the top bar, just left of Layout', pill.sameRow && pill.left && pill.spinner && /Snapshot/.test(pill.text), JSON.stringify(pill));
+const pill = await pg.evaluate(() => { const a = document.querySelector('#jobPill').getBoundingClientRect(), l = document.querySelector('#viewMenu').getBoundingClientRect(); return { sameRow: Math.abs(a.top - l.top) < 20, left: a.right <= l.left + 1, spinner: !!document.querySelector('#jobPill .spinner'), text: document.querySelector('#jobPill').textContent }; });
+check('Send closes the window and the work carries on in the background: a pill with a spinner appears in the top bar, just left of View', pill.sameRow && pill.left && pill.spinner && /Snapshot/.test(pill.text), JSON.stringify(pill));
 check('the pill says what it is doing and counts the time', /Reading your notes/.test(pill.text) && /\d:\d\d/.test(pill.text), pill.text);
 // DM Forge keeps working while it reads
 await pg.click('.nav-btn:has-text("NPCs")');

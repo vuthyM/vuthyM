@@ -2112,12 +2112,33 @@ export function liveTarget() {
 /* setLive(path): that session is live; setLive(true): the open (or current) session; setLive(false) or '': none */
 export function setLive(on, path) {
   const target = typeof on === 'string' ? on : on ? (path || liveTarget()) : '';
+  try { localStorage.removeItem(modeKey(target || S.live || '')); } catch (e) { /* storage unavailable */ }      // going Live (or ending it) lets the mode follow what is happening
   S.live = target || '';
   saveLive();
   if (S.live) setCurrentSession(S.live);
   set({ live: S.live });
 }
 export const toggleLive = path => setLive(S.live === path ? '' : path);
+
+/* ---------- a session page's mode: Prep, Run or Wrap up ---------- */
+export const SESSION_MODES = [['prep', 'Prep'], ['run', 'Run'], ['wrap', 'Wrap up']];
+const modeKey = p => 'dmforge:mode:' + S.vaultKey + '|' + p;
+const modeOverride = p => { try { const v = localStorage.getItem(modeKey(p)); return v === 'prep' || v === 'run' || v === 'wrap' ? v : ''; } catch (e) { return ''; } };
+/* what the session is doing now: live, a fight under way or the timer running is Run; a log with lines in it (and nothing running) is Wrap up; otherwise Prep */
+export function autoSessionMode(note) {
+  if (S.live === note.path) return 'run';
+  if (S.combat && S.combatTarget === note.path) return 'run';
+  if (S.timer && S.timer.run && currentSessionPath() === note.path) return 'run';
+  const sp = splitFrontmatter(S.working.get(note.path) || '');
+  if (parseLog(sp.body).length || /<!-- dmforge:(?:dm-recap|tidy)/.test(sp.body)) return 'wrap';
+  return 'prep';
+}
+/* the mode shown: the one you chose for this session, else the automatic one. Going Live puts you in Run, and taking it off lets it go automatic again. */
+export const sessionMode = note => modeOverride(note.path) || autoSessionMode(note);
+export function setSessionMode(path, mode) {
+  try { if (mode) localStorage.setItem(modeKey(path), mode); else localStorage.removeItem(modeKey(path)); } catch (e) { /* storage unavailable */ }
+  emit();
+}
 
 /* Improvise an NPC: a roll to look at, then Save makes the NPC note (placed at the session's first place, or the one you pick),
    links them under the session's cast heading and logs that they were met. */

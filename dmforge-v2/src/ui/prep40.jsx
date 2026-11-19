@@ -234,7 +234,7 @@ function EncounterEditor({ note, enc, all, onDone }) {
   );
 }
 
-export function EncountersCard({ note }) {
+export function EncountersCard({ note, hideEmpty }) {
   useApp();
   const [editing, setEditing] = useState(null);       // the line the encounter being edited starts on
   const idx = getIndex();
@@ -242,6 +242,7 @@ export function EncountersCard({ note }) {
   const encs = parseEncounters(note.body);
   const rows = partyRows(idx, absentOf(note.fm)).filter(r => r.here && r.level);
   const b = budgetFor(rows.map(r => r.level));
+  if (!encs.length && hideEmpty) return null;
   if (!encs.length) return (
     <div class="enc-empty small muted" id="encEmpty">No prepared encounters. Line one up on the <a href="#" onClick={e => { e.preventDefault(); setSection('party'); }}>Party page</a> and press <b>Save to session</b>.</div>
   );

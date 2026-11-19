@@ -4,7 +4,8 @@
    - startHelper(): the real helper on that folder, on a temp config dir
    - snap(dir): sha1 of every file, to compare a vault before and after
    Nothing here touches a real vault. */
-import { chromium } from '../../jsd/node_modules/playwright-core/index.mjs';
+import { createRequire as __pwRequire } from 'node:module';
+const { chromium } = __pwRequire(import.meta.url)('playwright');
 import { spawn } from 'node:child_process';
 import crypto from 'node:crypto';
 import fs from 'node:fs'; import os from 'node:os'; import path from 'node:path'; import url from 'node:url';

@@ -1,4 +1,5 @@
-import { chromium } from '../../jsd/node_modules/playwright-core/index.mjs';
+import { createRequire as __pwRequire } from 'node:module';
+const { chromium } = __pwRequire(import.meta.url)('playwright');
 import { spawn } from 'node:child_process';
 import fs from 'node:fs'; import os from 'node:os'; import path from 'node:path'; import url from 'node:url'; import http from 'node:http';
 import { demoFiles } from '../src/core/demo.js';

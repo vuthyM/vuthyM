@@ -1,5 +1,6 @@
 import { build } from 'esbuild';
-import { chromium } from '../../jsd/node_modules/playwright-core/index.mjs';
+import { createRequire as __pwRequire } from 'node:module';
+const { chromium } = __pwRequire(import.meta.url)('playwright');
 import fs from 'node:fs'; import path from 'node:path'; import url from 'node:url'; import http from 'node:http';
 const here = path.dirname(url.fileURLToPath(import.meta.url));
 const out = path.join(here, '.opfs-bundle.js');

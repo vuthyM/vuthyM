@@ -1,12 +1,11 @@
 /* Preload for the browser tests: --import this file. The sidebar folds its groups (one open at a time), so Playwright
    would find most nav buttons "not visible". Tests that are not about folding keep every group open. */
-import { chromium } from '../../jsd/node_modules/playwright-core/index.mjs';
 import { createRequire } from 'node:module';
 import path from 'node:path'; import url from 'node:url';
 const here = path.dirname(url.fileURLToPath(import.meta.url));
 let other = null; try { other = createRequire(path.join(here, 'x.js'))('playwright').chromium; } catch {}
 const CSS = '.nav-items[hidden]{display:block !important}';
-for (const cr of [chromium, other]) if (cr) { const launch = cr.launch.bind(cr);
+for (const cr of [other]) if (cr) { const launch = cr.launch.bind(cr);
  cr.launch = async (...a) => {
   const b = await launch(...a);
   const nc = b.newContext.bind(b);

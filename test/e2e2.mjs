@@ -1,4 +1,5 @@
-import { chromium } from '../../jsd/node_modules/playwright-core/index.mjs';
+import { createRequire as __pwRequire } from 'node:module';
+const { chromium } = __pwRequire(import.meta.url)('playwright');
 import fs from 'node:fs'; import path from 'node:path'; import url from 'node:url'; import http from 'node:http';
 const here = path.dirname(url.fileURLToPath(import.meta.url));
 const dist = path.join(here, '..', 'dist', 'DM-Forge.html');
@@ -998,7 +999,7 @@ for (const width of [1000, 1360, 1800, 860]) {
   await pg.waitForFunction(() => !document.querySelector('.modal'));
   const ta = await pg.inputValue('.pane:not([hidden]) textarea');
   check('in the editor it lands at the cursor, with a blank line after it', ta.startsWith('> [!note]- NPC name') && ta.indexOf('> - **Stat block:**') > 0 && /\n\n/.test(ta.slice(0, ta.indexOf('_If unsure:_') + 30 + 20)));
-  await pg.waitForFunction(() => document.querySelector('.pane:not([hidden]) textarea').selectionStart > 0);
+  await pg.waitForFunction(() => { const t = document.querySelector('.pane:not([hidden]) textarea'); return t.selectionStart > 0 && t.selectionStart < t.value.indexOf('_If unsure:_') + 40; });   // the editor first puts the caret at the end, then the template moves it
   const caret = await pg.evaluate(() => { const t = document.querySelector('.pane:not([hidden]) textarea'); return [t.selectionStart, t.value.indexOf('_If unsure:_')]; });
   check('and the cursor sits at the end of what was added', caret[0] > caret[1] && caret[0] < caret[1] + 40, JSON.stringify(caret));
   await pg.click('.pane:not([hidden]) button:has-text("Cancel")');

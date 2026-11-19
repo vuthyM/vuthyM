@@ -7,6 +7,17 @@ export const KINDS = { new: 'New', improved: 'Improved', fixed: 'Fixed' };
 
 export const CHANGELOG = [
   {
+    version: '2.52.0', date: '2026-11-19', title: 'A calmer top bar and a session page that puts the note first',
+    changes: [
+      ['new', 'The session page has three modes, Prep, Run and Wrap up, and shows only the buttons for the one you are in. Prep: Import last session, the cast, the prep check and prepared encounters. Run: Go live, Run combat and the Live panel. Wrap up: Tidy notes and Close out (the main button). The mode picks itself (a session you have not played is Prep, going Live, a fight or the running timer is Run, a session with a log is Wrap up) and you can switch it with the tabs under the title; your choice is remembered for that session.'],
+      ['improved', 'The note comes first. Properties, the outline, links, "mentioned in" and the file path are folded under one "Details" line; the cast is a one-line "Cast: 4 players, 2 NPCs, 1 place" you open when you want it; the empty "no prepared encounters" hint is gone. The notes now start about a third of the way down the window instead of below the fold.'],
+      ['improved', 'Opening a session gives the note the whole page. The session list and the "Sessions" heading step aside, with "← All sessions" at the top to go back (also while editing). The title line shows the date and session number instead of the file path.'],
+      ['improved', 'The top bar is quieter: search, back and forward, the timer / dice / log tools, one "View" menu, and Push. The cheat sheet, the campaign snapshot, the layout choices (with Table mode) and light / dark (or follow your Mac) moved into View. Push goes quiet when there is nothing to push and fills in when there is.'],
+      ['improved', 'A calmer look, same warm identity: the thick accent stripes on one side of callouts, quotes, notes and selected rows are gone (a faint tint and a hairline instead), the boxes on the session page lose their borders, and quiet buttons and labels are a touch darker so they stay readable.'],
+      ['fixed', 'On a phone-sized window the top bar could push the page sideways when there were changes to push; it now fits.'],
+    ],
+  },
+  {
     version: '2.51.2', date: '2026-11-15', title: 'No Table rules in the Session prep template',
     changes: [
       ['improved', 'The "Session prep" template (Add template) no longer has a "Table rules" block: it starts with MUST HAPPEN, then Locations, the State tracker and the NPC heading. Sessions you already made keep whatever they have.'],

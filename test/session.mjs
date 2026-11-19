@@ -89,6 +89,7 @@ const add = async (text, tag) => { if (tag) await pg.click('[data-log-tag="' + t
 check('the top bar has a Log button, left of the View menu, and the box is closed', await pg.locator('.topbar #logBtn').count() === 1 && await pg.locator('#logBox').count() === 0 && await pg.evaluate(() => document.querySelector('#logBtn').getBoundingClientRect().right <= document.querySelector('#viewMenu').getBoundingClientRect().left + 1));
 await pg.click('#logBtn');
 await pg.waitForSelector('#logBox');
+await pg.waitForFunction(() => document.activeElement && document.activeElement.id === 'sessionLine', null, { timeout: 3000 }).catch(() => {});
 check('it opens a small box with the cursor in it, logging to the newest session', await pg.evaluate(() => document.activeElement && document.activeElement.id === 'sessionLine') && (await pg.inputValue('#sessionPick')) === S12);
 await add('The ferryman is nervous');
 let t = await get(S12);

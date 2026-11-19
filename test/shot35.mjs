@@ -1,0 +1,17 @@
+import { createRequire } from 'node:module';
+import path from 'node:path'; import url from 'node:url'; import fs from 'node:fs';
+const { chromium } = createRequire(import.meta.url)('playwright');
+const here = path.dirname(url.fileURLToPath(import.meta.url));
+const S = '/tmp/claude-0/-home-user-vuthyM/1d654b07-7e86-58fc-b4c9-13f1eaeef043/scratchpad/shots35/'; fs.mkdirSync(S, { recursive: true });
+const b = await chromium.launch({ args: ['--no-sandbox'] });
+const pg = await (await b.newContext({ viewport: { width: 1440, height: 1000 } })).newPage();
+await pg.goto('file://' + path.join(here, '..', 'dist', 'DM-Forge.html'));
+await pg.click('text=Try the demo vault'); await pg.waitForSelector('.sidebar');
+await pg.evaluate(() => window.__dmforge.A.updateSetting('groupAfter', 10));
+await pg.evaluate(() => [...document.querySelectorAll('.nav-btn')].find(e => /NPCs/.test(e.textContent)).click());
+await pg.waitForSelector('.grp-head');
+await pg.screenshot({ path: S + '1-collapsed.png' });
+await pg.click('[data-grouphead="Greenhold"]'); await pg.click('[data-grouphead="Not placed anywhere"]');
+await pg.click('[data-note="Finch"]'); await pg.waitForSelector('#placeField');
+await pg.screenshot({ path: S + '2-open.png' });
+await b.close();

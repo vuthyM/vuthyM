@@ -1,0 +1,17 @@
+import { createRequire } from 'node:module';
+import path from 'node:path'; import url from 'node:url'; import fs from 'node:fs';
+const { chromium } = createRequire(import.meta.url)('playwright');
+const here = path.dirname(url.fileURLToPath(import.meta.url));
+const S = '/tmp/claude-0/-home-user-vuthyM/1d654b07-7e86-58fc-b4c9-13f1eaeef043/scratchpad/shots36/'; fs.mkdirSync(S, { recursive: true });
+const b = await chromium.launch({ args: ['--no-sandbox'] });
+const pg = await (await b.newContext({ viewport: { width: 1440, height: 900 } })).newPage();
+await pg.goto('file://' + path.join(here, '..', 'dist', 'DM-Forge.html'));
+await pg.click('text=Try the demo vault'); await pg.waitForSelector('.sidebar');
+await pg.evaluate(() => [...document.querySelectorAll('.nav-btn')].find(e => /NPCs/.test(e.textContent)).click());
+await pg.waitForSelector('#lvBar');
+await pg.click('#grpPick'); await pg.click('.list-item:has-text("Finch")'); await pg.click('.list-item:has-text("Edda Wick")');
+await pg.screenshot({ path: S + '1-list.png' });
+await pg.keyboard.press('Control+KeyK'); await pg.fill('#palInput', 'cin');
+await pg.waitForTimeout(200);
+await pg.screenshot({ path: S + '2-palette.png' });
+await b.close();

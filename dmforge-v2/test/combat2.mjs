@@ -167,7 +167,8 @@ await pg.uncheck('#setSrd'); await pg.click('#navBack'); await pg.waitForFunctio
 await pg.click('#addTabMonsters'); await pg.click('#openLibrary'); await pg.waitForSelector('#mlSearch');
 check('with the built-in monsters switched off, only yours are listed (and no SRD credit)', (await pg.textContent('#mlCount')).startsWith('1 of 1') && await pg.locator('#mlCredit').count() === 0, await pg.textContent('#mlCount'));
 await pg.setViewportSize({ width: 390, height: 800 });
-check('on a phone-sized window the library fits', await pg.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth));
+await pg.waitForTimeout(400);
+check('on a phone-sized window the library fits', await pg.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), await pg.evaluate(() => document.documentElement.scrollWidth + ' vs ' + window.innerWidth));
 await pg.setViewportSize({ width: 1360, height: 900 });
 await pg.click('.modal .modal-actions button:has-text("Done")');
 // pinned controls

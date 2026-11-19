@@ -77,6 +77,8 @@ ring, in both themes, and each campaign keeps its own.
 Turn on **Live** and it sits at the top of the session with the cast under it: must-happens, clocks, hidden secrets and open threads in one grid. Edit, Pin, Live and
 Run combat are the buttons for play; Import last session, Tidy notes, Close out and ⋯ are for prep and afterwards (Open in Obsidian is in the ⋯ menu on a session note). Ctrl+K (⌘K) opens the quick switcher; the search box says so.
 
+**The session page has three modes**, picked for you and switchable with the tabs under the title: **Prep** (Import last session, the cast, Prep check, prepared encounters, where you left off), **Run** (Go live, Run combat, the Live panel, prepared encounters) and **Wrap up** (Tidy notes…, Close out…). A session you have not played is Prep; going Live, a fight under way or the running timer is Run; a session with a log is Wrap up. Your choice is remembered for that session. The note comes first: properties, outline, links and the file path are folded under **Details**, and the cast is one line (**Cast**) you open when you want it. Opening a session gives it the whole page (**← All sessions** goes back to the list).
+
 ### A sidebar that gets out of the way
 
 The pin button at the top of the sidebar (or Settings, Layout and sidebar) hides it until you point at it: it shrinks to a column of icons, opens when the mouse rests
@@ -95,7 +97,7 @@ Travel and One-shot layouts.
 
 ### At the table
 
-**Table mode** (Layout menu or Ctrl+K) sets up the session, the Party and the NPC list in three panes; the cast strip's chips show a player or NPC beside the
+**Table mode** (View menu in the top bar, or Ctrl+K) sets up the session, the Party and the NPC list in three panes; the cast strip's chips show a player or NPC beside the
 session. Press **?** for every keyboard shortcut. A note's More menu has **Player-safe copy…** (secrets taken out, then copy or download).
 On a place's page, **Pin on a map…** arms the place on a map, and the **travel times** list shows distance and time on foot or horseback to the other places on its map.
 
@@ -601,7 +603,7 @@ says what it will do. Below 900 px wide the sidebar becomes a drawer; below 700 
 
 ## Light and dark
 
-The sun/moon button in the top bar (and on the welcome screen) switches mode, and every colour fades over 3 seconds
+Light and dark are in the **View** menu in the top bar (and the sun/moon button on the welcome screen); either switches mode, and every colour fades over 3 seconds
 while the page stays fully usable (plain CSS, nothing is frozen or snapshotted). It remembers your choice and otherwise follows the system. Shift-click to go back to following
 the system. With "reduce motion" on, it switches instantly.
 

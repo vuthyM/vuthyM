@@ -12,7 +12,7 @@ What I **cannot** see from here is your Mac, Brave, your real vault and Obsidian
 - [ ] Quit any old helper window (the Terminal one). Only ever run **one** helper: a second one picks a new port, and then your unpushed notes and your fight stay on the first one.
 - [ ] Unzip the new version. First time only: right-click `Start DM Forge.command`, **Open**, **Open**.
 - [ ] Terminal shows a link starting `http://127.0.0.1:8765/?t=`. Open it in **Brave**.
-- [ ] **Menu** shows version **2.51.2** (at the bottom of the sidebar).
+- [ ] **Menu** shows version **2.52.0** (at the bottom of the sidebar).
 - [ ] Your real campaign opens. Counts look right (NPCs, Players, Sessions). The top bar says nothing is pending.
 
 ## 3. Things that depend on a Mac (5 minutes)
@@ -37,7 +37,7 @@ What I **cannot** see from here is your Mac, Brave, your real vault and Obsidian
 - [ ] Log five lines with an `@mention` and a `[[New Person` (create from the log box).
 - [ ] **Push.** Then **Undo last push**, then check the notes are back as they were. Push again to put it back.
 - [ ] Refresh the page in the middle of the fight. The fight comes back exactly.
-- [ ] **Tidy notes** (new in 2.47): on the dry-run session press **Tidy notes…**. Send to Claude (or **Tidy without Claude** if you are not signed in). Read your notes on the left against the tidy version on the right, then **Apply**. Check: your Prep and the players' Recap look exactly as before, your promises still show in **What am I forgetting?**, and **Show my original** (under the title) shows exactly what you typed. Then **Put back my original…** and check everything is back as it was.
+- [ ] **Tidy notes** (new in 2.47): on the dry-run session switch to **Wrap up** and press **Tidy notes…**. Send to Claude (or **Tidy without Claude** if you are not signed in). Read your notes on the left against the tidy version on the right, then **Apply**. Check: your Prep and the players' Recap look exactly as before, your promises still show in **What am I forgetting?**, and **Show my original** (under the title) shows exactly what you typed. Then **Put back my original…** and check everything is back as it was.
 - [ ] Open the tidied note in **Obsidian**: it reads cleanly, and your original is hidden (it only shows in source mode, at the very bottom).
 - [ ] Delete the dry-run session and its test notes (or **Undo last push** until they are gone), and push.
 - [ ] If you use Claude for Close out: **Menu, Settings, Claude** shows it signed in. If you do not, switch it off.

@@ -10,6 +10,7 @@ import { timeAgo } from '../core/leftoff.js';
 import { EditableBody } from './editbody.jsx';
 import { CastStrip } from './cast.jsx';
 import { LivePanel, OutlineBar, ReadinessCard, EncountersCard } from './prep40.jsx';
+import { castOf } from '../core/cast.js';
 import { notePrompt, CLAUDE_SYSTEM, QUESTION_MARK } from '../core/claudeprompts.js';
 import { TYPES, OTHER, fieldDefs, getField, toStored, displayValue, typeInfo } from '../core/schema.js';
 import { suggestLinks, plainText } from '../core/mentions.js';
@@ -28,7 +29,7 @@ import { ListTools, BulkBar, loadView, saveView } from './listtools.jsx';
 import { facetFor, filterByFacet, sortNotes } from '../core/listview.js';
 import { seedersOf, seededThreads, seederFacet, filterBySeeder } from '../core/seeds.js';
 import { placesOf, textPlaces, threadsAt, appearsFacet, filterByPlace, groupByPlace } from '../core/appears.js';
-import { movePlace, duplicateNote, toggleLive, setNoteProp } from './actions.js';
+import { movePlace, duplicateNote, toggleLive, setNoteProp, sessionMode, setSessionMode, SESSION_MODES } from './actions.js';
 import { locationTree, canMoveInto } from '../core/locations.js';
 import { startTour, tourSeen, lastSessionInfo, importLastSession, isFav, toggleFav, timerToggle, timerElapsed } from './actions.js';
 import { parseScenes } from '../core/scenes.js';
@@ -104,20 +105,21 @@ export function EntityPage({ type }) {
   const sel = tab.selected && idx.byPath.get(tab.selected);
   const selected = sel && sel.type === type ? sel : null;
   const create = () => set({ dialog: type === 'session' ? { kind: 'newSession' } : { kind: 'new', type } });
+  const reader = !!selected && type === 'session';          // a session open: the note fills the page, the list is one click away (← All sessions)
   return (
     <>
-      <div class="page-head">
+      {!reader && <div class="page-head">
         <h2 aria-level="1">{t.label}</h2>
         <button class="btn btn-primary" onClick={create}>+ New {t.single}</button>
-      </div>
+      </div>}
       {!all.length ? (
         <Empty title={'No ' + t.label.toLowerCase() + ' yet'}>
           Add the first one, or point DM Forge at a different folder with “Edit folder mapping”.
           <div style="margin-top:12px"><button class="btn btn-primary" onClick={create}>+ New {t.single}</button></div>
         </Empty>
       ) : (
-        <div class={'split scroll-split' + (selected ? ' has-sel' : '')}>
-          <div>
+        <div class={'split scroll-split' + (selected ? ' has-sel' : '') + (reader ? ' reader' : '')}>
+          {!reader && <div>
             <div class="field"><input type="search" placeholder={'Filter ' + t.label.toLowerCase()} value={q} onInput={e => setQ(e.currentTarget.value)} aria-label="Filter list" /></div>
             <ListTools type={type} facet={facet} seed={seed} appears={apFacet} view={{ ...view, facet: facetOn, seed: seedOn, appears: apOn }} onView={setView} pick={pick} onPick={() => { setPick(!pick); setChosen(new Set()); }} />
             {pick && <BulkBar type={type} chosen={chosen} shown={items.map(x => x.path)} onChosen={setChosen} onDone={() => setChosen(new Set())} />}
@@ -152,8 +154,8 @@ export function EntityPage({ type }) {
               ))}
               {!shown.length && <div class="muted small">Nothing matches “{q}”.</div>}
             </div>)}
-          </div>
-          <div>{selected && <button class="btn btn-sm back-list" id="backToList" onClick={() => set({ selected: null, editing: false })}>← All {t.label.toLowerCase()}</button>}{selected ? <NoteView key={selected.path} note={selected} /> : <Empty title={'Select ' + (/^([aeiou]|npc$)/i.test(t.single) ? 'an' : 'a') + ' ' + (/^[A-Z]{2,}$/.test(t.single) ? t.single : t.single.toLowerCase())}>Its properties, text and links appear here. Ctrl- or ⌘-click opens it in a new tab.</Empty>}</div>
+          </div>}
+          <div>{selected && !reader && <button class="btn btn-sm back-list" id="backToList" onClick={() => set({ selected: null, editing: false })}>← All {t.label.toLowerCase()}</button>}{selected ? <NoteView key={selected.path} note={selected} /> : <Empty title={'Select ' + (/^([aeiou]|npc$)/i.test(t.single) ? 'an' : 'a') + ' ' + (/^[A-Z]{2,}$/.test(t.single) ? t.single : t.single.toLowerCase())}>Its properties, text and links appear here. Ctrl- or ⌘-click opens it in a new tab.</Empty>}</div>
         </div>
       )}
     </>
@@ -439,11 +441,125 @@ function LeftOff({ note }) {
   );
 }
 
+/* the ⋯ menu of a note */
+function MoreMenu({ note, del }) {
+  const s = useApp();
+  return (
+    <PopMenu id="noteMore" title="More actions for this note">
+      {({ close }) => (
+        <>
+          {note.type === 'session' && <a class="pop-item" id="obsidianBtn" role="menuitem" href={obsidianUrl(note.path)} title="Open this note in Obsidian" onClick={() => close()}><Icon name="ext" size={16} />Open in Obsidian</a>}
+          <button class="pop-item" id="renameBtn" role="menuitem" title="Change the file name, the title at the top, and the links to it (F2)" onClick={() => { close(); set({ dialog: { kind: 'rename', path: note.path } }); }}><Icon name="pencil" size={16} />Rename…</button>
+          <button class="pop-item" id="reformatBtn" role="menuitem" title="Fix markdown that renders badly (spacing, headings, tables, lists). Obsidian features are left alone." onClick={() => { close(); reformatNote(note.path); }}><Icon name="wand" size={16} />Reformat</button>
+          <button class="pop-item" id="moveBtn" role="menuitem" onClick={() => { close(); set({ dialog: { kind: 'move', path: note.path } }); }}><Icon name="move" size={16} />Move…</button>
+          <button class="pop-item" id="dupBtn" role="menuitem" title="Make a copy of this note beside it, named “… (copy)”" onClick={() => { close(); const np = duplicateNote(note.path); if (np) toast('Made a copy. Push changes to save it.'); }}><Icon name="tab" size={16} />Duplicate</button>
+          <button class="pop-item" id="psBtn" role="menuitem" title="A copy without the DM’s secrets, to read out, paste or send to players" onClick={() => { close(); set({ dialog: { kind: 'playersafe', path: note.path } }); }}><Icon name="ext" size={16} />Player-safe copy…</button>
+          {claudeOn() && <button class="pop-item" id="askClaudeBtn" role="menuitem" title="Ask Claude a question about this note (you see exactly what is sent first)" onClick={() => { close(); askClaude({ title: 'Ask Claude about “' + note.name + '”', system: CLAUDE_SYSTEM, prompt: notePrompt(note, s.campaign && s.campaign.name), needs: QUESTION_MARK }); }}><Icon name="spark" size={16} />Ask Claude</button>}
+          <button class="pop-item" id="graphBtn" role="menuitem" title="See what this note connects to" onClick={() => { close(); openGraph(note.path); }}><Icon name="graph" size={16} />Show in graph</button>
+          <button class="pop-item" id="newTabBtn" role="menuitem" onClick={() => { close(); openTab({ section: sectionForType(note.type), selected: note.path }); }}><Icon name="tab" size={16} />Open in new tab</button>
+          {note.type === 'session' && <button class="pop-item" id="addTemplateBtn" role="menuitem" title="Paste a blank layout (must happen, places, state tracker, NPC cards)" onClick={() => { close(); set({ dialog: { kind: 'template', path: note.path } }); }}><Icon name="file" size={16} />Add template…</button>}
+          <div class="pop-sep" />
+          <button class="pop-item danger" id="deleteBtn" role="menuitem" onClick={() => { close(); del(); }}><Icon name="trash" size={16} />Delete…</button>
+        </>
+      )}
+    </PopMenu>
+  );
+}
+
+/* the cast of a session, folded to one line (who is in it, and how many) until you want it: adding an NPC and who is likely there are inside */
+function CastFold({ note, idx }) {
+  useApp();
+  const cast = castOf(idx, note);
+  const key = 'dmforge:sp-cast';
+  const [open, setOpen] = useState(() => { try { return localStorage.getItem(key) === '1'; } catch (e) { return false; } });
+  const n = (c, w) => c + ' ' + w + (c === 1 ? '' : 's');
+  return (
+    <details class="sp-cast" id="spCast" open={open} onToggle={e => { const o = e.currentTarget.open; setOpen(o); try { localStorage.setItem(key, o ? '1' : '0'); } catch (err) { /* storage unavailable */ } }}>
+      <summary><span>Cast</span><span class="muted small">{[n(cast.players.length, 'player'), n(cast.npcs.length, 'NPC'), cast.places.length ? n(cast.places.length, 'place') : ''].filter(Boolean).join(' · ')}</span></summary>
+      <CastStrip note={note} />
+    </details>
+  );
+}
+
+/* A session note, laid out for what you are doing: Prep, Run or Wrap up. The note comes first; the cast, properties, outline and links are folded under Details. */
+function SessionPage({ note, idx }) {
+  const s = useApp();
+  const mode = sessionMode(note);
+  const live = s.live === note.path;
+  const back = idx.backlinks.get(note.path) || [];
+  const del = () => set({ dialog: { kind: 'confirm', title: 'Delete “' + note.name + '”?', body: 'It is removed from the app now and moved to the vault’s .trash folder when you push. Until then you can undo it from Pending changes.', confirmLabel: 'Delete', danger: true, onConfirm: () => { deleteNote(note.path); toast('Deleted ' + note.name + '. Push changes to move it to the trash.'); } } });
+  const sub = [note.sdate, note.snum != null ? 'Session ' + note.snum : ''].filter(Boolean).join(' · ');
+  return (
+    <div class="card session-page" data-mode={mode}>
+      {note.pending && (
+        <div class="unpushed-bar">
+          <span>{note.pending === 'create' ? 'New note. Not in your vault until you push.' : 'Edited. Not in your vault until you push.'}</span>
+          <button class="btn btn-sm" onClick={() => discardChange(note.path)}>{note.pending === 'create' ? 'Discard note' : 'Undo my edits'}</button>
+        </div>
+      )}
+      <div class="note-head sp-head">
+      <div class="sp-top">
+        <button class="linkish sp-back" id="backToList" onClick={() => set({ selected: null, editing: false })}>← All sessions</button>
+        <div class="sp-top-actions">
+          <button class={'btn btn-sm' + (mode === 'prep' ? ' btn-primary' : '')} id="editBtn" onClick={() => set({ editing: true })}><Icon name="pencil" size={15} />Edit</button>
+          <button class={'tb-icon note-pin' + (isFav('note:' + note.path) ? ' pinned' : '')} id="pinNote" aria-pressed={isFav('note:' + note.path)} title={isFav('note:' + note.path) ? 'Unpin from Favourites' : 'Pin to Favourites (the top of the sidebar)'} aria-label={isFav('note:' + note.path) ? 'Unpin from Favourites' : 'Pin to Favourites'} onClick={() => toggleFav('note:' + note.path)}><Icon name="star" size={17} fill={isFav('note:' + note.path)} /></button>
+          <MoreMenu note={note} del={del} />
+        </div>
+      </div>
+      <h2 id="noteTitle" class="renamable sp-title" title="Double-click to rename (F2)" onDblClick={() => set({ dialog: { kind: 'rename', path: note.path } })}>{note.name}</h2>
+      {sub && <div class="sp-sub">{sub}</div>}
+      </div>
+      <div class="sp-modes" role="tablist" aria-label="What you are doing with this session">
+        {SESSION_MODES.map(([k, label]) => (
+          <button key={k} role="tab" class={'sp-mode' + (mode === k ? ' on' : '')} aria-selected={mode === k} data-mode={k} id={'mode-' + k} onClick={() => setSessionMode(note.path, k)}>{label}</button>
+        ))}
+      </div>
+      <div class="sp-bar" id="spBar">
+        {mode === 'prep' && <ImportLastButton path={note.path} />}
+        {mode === 'run' && <>
+          <button class={'btn' + (live ? ' btn-live' : ' btn-primary')} id="liveBtn" aria-pressed={live} title="Everything for mid-session on this page: must-happen items, clocks, secrets, the log" onClick={() => toggleLive(note.path)}>{live ? '● Live now' : 'Go live'}</button>
+          <button class="btn" id="runCombatBtn" onClick={() => set({ section: 'combat', combatTarget: note.path, selected: null })}>Run combat</button>
+        </>}
+        {mode === 'wrap' && <>
+          <button class="btn" id="tidyBtn" title="After the session: your rough notes organised by scene. Your original is kept." onClick={() => set({ dialog: { kind: 'tidy', path: note.path } })}>Tidy notes…</button>
+          <button class="btn btn-primary" id="closeoutBtn" title="After the session: a recap for you, thread and NPC updates, and what to carry to next time" onClick={() => set({ dialog: { kind: 'closeout', path: note.path } })}>Close out…</button>
+        </>}
+      </div>
+      {mode === 'run' && live && <LivePanel note={note} />}
+      {mode === 'wrap' && <TidyStrip path={note.path} />}
+      <ReformatBar note={note} />
+      {mode === 'prep' && <LeftOff note={note} />}
+      {mode === 'prep' && <CastFold note={note} idx={idx} />}
+      {mode === 'prep' && <ReadinessCard note={note} />}
+      {(mode === 'prep' || mode === 'run') && <EncountersCard note={note} hideEmpty />}
+      <details class="sp-details" id="spDetails">
+        <summary><span>Details</span><span class="muted small">properties, outline, links</span></summary>
+        <div class="sp-details-body">
+          <div class="small muted sp-path">{note.rel}</div>
+          <PropsBlock note={note} idx={idx} />
+          <OutlineBar note={note} />
+          <NoteClocks note={note} idx={idx} />
+          <LinkSuggest note={note} idx={idx} />
+          {mode !== 'prep' && <CastStrip note={note} />}
+          {back.length > 0 && (
+            <div>
+              <label class="lbl">Mentioned in</label>
+              <div class="chips">{back.map(b => <a key={b.path} class="chip-link" href="#" onClick={e => { e.preventDefault(); navTo(b.path, e); }}>{b.name}</a>)}</div>
+            </div>
+          )}
+        </div>
+      </details>
+      {note.body.trim() ? <EditableBody note={note} idx={idx} rev={s.dataRev} fallback={<Markdown body={viewBody(note)} index={idx} rev={s.dataRev} ctx={note.path} />} jump={s.jump} /> : <p class="muted">This note has no text yet. Choose Edit to add some.</p>}
+    </div>
+  );
+}
+
 export function NoteView({ note }) {
   const s = useApp();
   const tab = useTab();
   const idx = getIndex();
   if (tab.editing) return <NoteEditor note={note} />;
+  if (note.type === 'session') return <SessionPage note={note} idx={idx} />;
   const back = idx.backlinks.get(note.path) || [];
   const del = () => set({ dialog: { kind: 'confirm', title: 'Delete “' + note.name + '”?', body: 'It is removed from the app now and moved to the vault’s .trash folder when you push. Until then you can discard the change.', confirmLabel: 'Delete note', danger: true, onConfirm: () => deleteNote(note.path) } });
   return (
@@ -472,24 +588,7 @@ export function NoteView({ note }) {
           {note.type === 'session' && <button class="btn btn-sm" id="tidyBtn" title="After the session: your rough notes organised by scene. Your original is kept." onClick={() => set({ dialog: { kind: 'tidy', path: note.path } })}>Tidy notes…</button>}
           {note.type === 'session' && <button class="btn btn-sm" id="closeoutBtn" title="After the session: a recap for you, thread and NPC updates, and what to carry to next time" onClick={() => set({ dialog: { kind: 'closeout', path: note.path } })}>Close out…</button>}
           {note.type !== 'session' && <a class="btn btn-sm" href={obsidianUrl(note.path)} title="Open this note in Obsidian"><Icon name="ext" size={15} />Obsidian</a>}
-          <PopMenu id="noteMore" title="More actions for this note">
-            {({ close }) => (
-              <>
-                {note.type === 'session' && <a class="pop-item" id="obsidianBtn" role="menuitem" href={obsidianUrl(note.path)} title="Open this note in Obsidian" onClick={() => close()}><Icon name="ext" size={16} />Open in Obsidian</a>}
-                <button class="pop-item" id="renameBtn" role="menuitem" title="Change the file name, the title at the top, and the links to it (F2)" onClick={() => { close(); set({ dialog: { kind: 'rename', path: note.path } }); }}><Icon name="pencil" size={16} />Rename…</button>
-                <button class="pop-item" id="reformatBtn" role="menuitem" title="Fix markdown that renders badly (spacing, headings, tables, lists). Obsidian features are left alone." onClick={() => { close(); reformatNote(note.path); }}><Icon name="wand" size={16} />Reformat</button>
-                <button class="pop-item" id="moveBtn" role="menuitem" onClick={() => { close(); set({ dialog: { kind: 'move', path: note.path } }); }}><Icon name="move" size={16} />Move…</button>
-                <button class="pop-item" id="dupBtn" role="menuitem" title="Make a copy of this note beside it, named “… (copy)”" onClick={() => { close(); const np = duplicateNote(note.path); if (np) toast('Made a copy. Push changes to save it.'); }}><Icon name="tab" size={16} />Duplicate</button>
-                <button class="pop-item" id="psBtn" role="menuitem" title="A copy without the DM’s secrets, to read out, paste or send to players" onClick={() => { close(); set({ dialog: { kind: 'playersafe', path: note.path } }); }}><Icon name="ext" size={16} />Player-safe copy…</button>
-                {claudeOn() && <button class="pop-item" id="askClaudeBtn" role="menuitem" title="Ask Claude a question about this note (you see exactly what is sent first)" onClick={() => { close(); askClaude({ title: 'Ask Claude about “' + note.name + '”', system: CLAUDE_SYSTEM, prompt: notePrompt(note, s.campaign && s.campaign.name), needs: QUESTION_MARK }); }}><Icon name="spark" size={16} />Ask Claude</button>}
-                <button class="pop-item" id="graphBtn" role="menuitem" title="See what this note connects to" onClick={() => { close(); openGraph(note.path); }}><Icon name="graph" size={16} />Show in graph</button>
-                <button class="pop-item" id="newTabBtn" role="menuitem" onClick={() => { close(); openTab({ section: sectionForType(note.type), selected: note.path }); }}><Icon name="tab" size={16} />Open in new tab</button>
-                {note.type === 'session' && <button class="pop-item" id="addTemplateBtn" role="menuitem" title="Paste a blank layout (must happen, places, state tracker, NPC cards)" onClick={() => { close(); set({ dialog: { kind: 'template', path: note.path } }); }}><Icon name="file" size={16} />Add template…</button>}
-                <div class="pop-sep" />
-                <button class="pop-item danger" id="deleteBtn" role="menuitem" onClick={() => { close(); del(); }}><Icon name="trash" size={16} />Delete…</button>
-              </>
-            )}
-          </PopMenu>
+          <MoreMenu note={note} del={del} />
           </div>
         </div>
       </div>
@@ -565,6 +664,7 @@ function NoteEditor({ note }) {
   const names = idx.notes.map(n => n.name).sort((a, b) => a.localeCompare(b));
   return (
     <div class="card">
+      {note.type === 'session' && <button class="linkish sp-back" id="backToList" style="margin-bottom:8px" onClick={() => set({ selected: null, editing: false })}>← All sessions</button>}
       <div class="note-head"><div><h2>Editing {note.name}</h2><div class="small muted">{note.rel}</div></div></div>
       {defs.length > 0 && (
         <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px 14px;margin-bottom:6px">

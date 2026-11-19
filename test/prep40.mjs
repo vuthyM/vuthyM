@@ -11,6 +11,7 @@ const errors = []; pg.on('pageerror', e => errors.push(e.message));
 await pg.goto('file://' + path.join(here, '..', 'dist', 'DM-Forge.html'));
 await pg.click('text=Try the demo vault');
 await pg.waitForSelector('.sidebar');
+await pg.evaluate(() => localStorage.setItem('dmforge:sp-cast', '1'));
 const P = '.pane:not([hidden]) ';
 const open = name => pg.evaluate(n => { const x = window.__dmforge.getIndex().notes.find(y => y.name === n); window.__dmforge.A.goto(x.path); }, name);
 const note = name => pg.evaluate(n => { const x = window.__dmforge.getIndex().notes.find(y => y.name === n); return x ? { path: x.path, body: x.body, text: window.__dmforge.S.working.get(x.path), type: x.type, fm: x.fm } : null; }, name);
@@ -60,6 +61,7 @@ check('adds them to the session\'s cast', after.body.includes('[[' + improvName 
 check('and logs that they were met', after.body.includes('Met [[' + improvName + ']]'));
 
 // ---- the live panel
+await pg.click(P + '#mode-run');
 await pg.click(P + '#liveBtn');
 await pg.waitForSelector(P + '#livePanel');
 check('Live opens a panel on the session', await pg.locator(P + '#livePanel').count() === 1);
@@ -84,13 +86,13 @@ const other = await pg.evaluate(n => window.__dmforge.getIndex().byType.session.
 const otherName = await pg.evaluate(p => window.__dmforge.getIndex().byPath.get(p).name, other);
 check('Live is on for this session', await pg.evaluate(p => window.__dmforge.S.live === window.__dmforge.getIndex().notes.find(x => x.name === p).path, sname));
 await pg.evaluate(p => window.__dmforge.A.goto(p), other);
-await pg.waitForSelector(P + '#liveBtn');
+await pg.click(P + '#mode-run'); await pg.waitForSelector(P + '#liveBtn');
 check('another session is not live: no Live panel on it', await pg.locator(P + '#livePanel').count() === 0);
 check('and its Live button is not pressed', (await pg.getAttribute(P + '#liveBtn', 'aria-pressed')) === 'false');
 await pg.click(P + '#liveBtn'); await pg.waitForSelector(P + '#livePanel');
 check('pressing Live on it makes it live', await pg.locator(P + '#livePanel').count() === 1 && (await pg.getAttribute(P + '#liveBtn', 'aria-pressed')) === 'true');
 check('and the log box now points at it', await pg.evaluate(p => window.__dmforge.A.currentSessionPath() === p, other));
-await open(sname); await pg.waitForSelector(P + '#liveBtn');
+await open(sname); await pg.click(P + '#mode-run'); await pg.waitForSelector(P + '#liveBtn');
 check('the first session is no longer live: its panel is gone and its button is not pressed', await pg.locator(P + '#livePanel').count() === 0 && (await pg.getAttribute(P + '#liveBtn', 'aria-pressed')) === 'false');
 await pg.evaluate(p => window.__dmforge.A.goto(p), other);
 await pg.waitForSelector(P + '#livePanel');
@@ -103,7 +105,7 @@ await pg.keyboard.press('Control+KeyK'); await pg.fill('#palInput', 'Live mode')
 check('and again turns it off', await pg.locator(P + '#livePanel').count() === 0);
 await pg.evaluate(() => { localStorage.setItem('dmforge:live', '1'); window.__dmforge.A.loadLive(); });
 check('an old on/off setting from before is ignored (nothing is live)', await pg.evaluate(() => window.__dmforge.S.live === ''));
-await open(sname); await pg.waitForSelector(P + '#liveBtn'); await pg.click(P + '#liveBtn'); await pg.waitForSelector(P + '#livePanel');          // back to Live on this session for the checks that follow
+await open(sname); await pg.click(P + '#mode-run'); await pg.waitForSelector(P + '#liveBtn'); await pg.click(P + '#liveBtn'); await pg.waitForSelector(P + '#livePanel');          // back to Live on this session for the checks that follow
 const clock = await pg.getAttribute(P + '#liveClocks [data-liveclock]', 'data-liveclock');
 const c0 = await pg.textContent(P + '#liveClocks [data-liveclock] [data-count]');
 await pg.click(P + '#liveClocks [data-liveclock] button[aria-label^="One slice forward"]');
@@ -146,7 +148,8 @@ await pg.evaluate(() => window.__dmforge.A.setLogOpen(false));
 
 // ---- the outline
 await open(sname);
-await pg.waitForSelector(P + '#castStrip');
+await pg.click(P + '#mode-prep'); await pg.waitForSelector(P + '#castStrip');
+await pg.evaluate(() => { const d = document.querySelector('.pane:not([hidden]) #spDetails'); if (d) d.open = true; });
 await pg.evaluate(p => { const i = window.__dmforge.getIndex().byPath.get(p); window.__dmforge.A.saveNoteEdit(p, { body: i.body.replace(/\s+$/, '') + '\n\n## Scene A\n\nOne.\n\n## Scene B\n\nTwo.\n\n## Scene C\n\nThree.\n' }); }, after.path);
 await pg.waitForSelector(P + '#outline');
 await pg.click(P + '#outline summary');

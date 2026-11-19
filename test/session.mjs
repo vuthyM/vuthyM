@@ -86,7 +86,7 @@ const lastCall = () => (fs.existsSync(calls) ? fs.readFileSync(calls, 'utf8').sp
 const add = async (text, tag) => { if (tag) await pg.click('[data-log-tag="' + tag + '"]'); await pg.fill('#sessionLine', text); await pg.keyboard.press('Enter'); };
 
 // 1. the log
-check('the top bar has a Log button, left of Snapshot, and the box is closed', await pg.locator('.topbar #logBtn').count() === 1 && await pg.locator('#logBox').count() === 0 && await pg.evaluate(() => document.querySelector('#logBtn').getBoundingClientRect().right <= document.querySelector('#snapBtn').getBoundingClientRect().left + 1));
+check('the top bar has a Log button, left of the View menu, and the box is closed', await pg.locator('.topbar #logBtn').count() === 1 && await pg.locator('#logBox').count() === 0 && await pg.evaluate(() => document.querySelector('#logBtn').getBoundingClientRect().right <= document.querySelector('#viewMenu').getBoundingClientRect().left + 1));
 await pg.click('#logBtn');
 await pg.waitForSelector('#logBox');
 check('it opens a small box with the cursor in it, logging to the newest session', await pg.evaluate(() => document.activeElement && document.activeElement.id === 'sessionLine') && (await pg.inputValue('#sessionPick')) === S12);

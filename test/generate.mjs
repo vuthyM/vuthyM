@@ -277,7 +277,7 @@ if (wants(4)) {
   }
   // two panes: two Generate tabs, each keeps its own place
   const pg = await demo(1360, 900);
-  await pg.click('#layoutBtn'); await pg.click('.ctx-item:has-text("Two columns")'); await pg.waitForFunction(() => !document.querySelector('.ctx'));
+  await pg.click('#viewMenu'); await pg.click('#viewLayout-two'); await pg.waitForFunction(() => !document.querySelector('.popmenu-pop:not([hidden])'));
   await pg.click('.nav-btn:has-text("Generate")'); await pg.waitForSelector('#genFind');
   await pg.click('.tabbar[data-pane="1"] .tab-new'); await pg.click('.nav-btn:has-text("Generate")');
   await pg.waitForFunction(() => document.querySelectorAll('.pane:not([hidden]) #genFind, .pane:not([hidden]) [data-gen]').length >= 1);

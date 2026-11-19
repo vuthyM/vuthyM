@@ -20,7 +20,7 @@ await away();
 
 // ---- closed: three tools in the pill, the cheat sheet in its own box
 check('the pill holds the timer, dice and log', await pg.locator('.island-bar #timerChip').count() === 1 && await pg.locator('.island-bar #diceBtn').count() === 1 && await pg.locator('.island-bar #logBtn').count() === 1);
-check('and the cheat sheet is in a box of its own', await pg.locator('.tb-solo #cheatBtn').count() === 1 && await pg.locator('.island-bar #cheatBtn').count() === 0);
+check('and the cheat sheet is in the View menu, not in the tools pill', await pg.locator('#viewMenu ~ .popmenu-pop #cheatBtn').count() === 1 && await pg.locator('.island-bar #cheatBtn').count() === 0);
 const closedW = await widthOf('.island-bar');
 const searchW0 = await widthOf('.search-wrap');
 
@@ -89,7 +89,7 @@ check('a line still logs from inside the island', await pg.evaluate(() => [...wi
 await pg.keyboard.press('Escape'); await sleep(250);
 
 // ---- the cheat sheet is its own thing
-await pg.click('#cheatBtn'); await sleep(350);
+await pg.click('#viewMenu'); await pg.click('#cheatBtn'); await sleep(350);
 check('the cheat sheet still opens as its own panel', await pg.locator('#cheatPanel').count() === 1 && await pg.locator('.island #cheatPanel').count() === 0);
 await pg.keyboard.press('Escape'); await sleep(250);
 

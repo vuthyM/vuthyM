@@ -11,6 +11,7 @@ const errors = []; pg.on('pageerror', e => errors.push(e.message));
 await pg.goto('file://' + path.join(here, '..', 'dist', 'DM-Forge.html'));
 await pg.click('text=Try the demo vault');
 await pg.waitForSelector('.sidebar');
+await pg.evaluate(() => localStorage.setItem('dmforge:sp-cast', '1'));
 const P = '.pane:not([hidden]) ';
 const open = name => pg.evaluate(n => { const x = window.__dmforge.getIndex().notes.find(y => y.name === n); window.__dmforge.A.goto(x.path); }, name);
 const domClick = sel => pg.evaluate(s => document.querySelector(s).click(), sel);

@@ -1,8 +1,9 @@
 import { canBack, canForward, navStep } from './store.js';
 import { useEffect, useRef, useState } from 'preact/hooks';
 import { S, set, useApp, getIndex } from './store.js';
-import { setSection, goto, startPush, closeCampaign, reloadCampaign, discardAll, openTab, activateTab, wantsNewTab, claudeOn, openLayoutMenu, setDiceOpen, timerOpen, setLogOpen, checkForUpdate, askInstallUpdate, laterUpdate } from './actions.js';
+import { setSection, goto, startPush, setLayout, tableMode, toggleCheat, setTheme, LAYOUTS, snapshotInfo, closeCampaign, reloadCampaign, discardAll, openTab, activateTab, wantsNewTab, claudeOn, openLayoutMenu, setDiceOpen, timerOpen, setLogOpen, checkForUpdate, askInstallUpdate, laterUpdate } from './actions.js';
 import { Sidebar } from './sidebar.jsx';
+import { describeSnapshot } from '../core/snapshot.js';
 import { PopMenu } from './popmenu.jsx';
 import { Icon } from './icons.jsx';
 import { TYPES, TYPE_ORDER, OTHER, isCustom, typeLabel, typeInfo } from '../core/schema.js';
@@ -97,6 +98,32 @@ function LayoutButton() {
       title={narrow ? 'Layouts need a wider window' : 'Choose how the window is divided into panes'}>
       <svg viewBox="0 0 18 18" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true">{icon}</svg><span class="sr">Layout</span>
     </button>
+  );
+}
+
+/* the View menu: the things you reach for now and then (cheat sheet, snapshot, how the window is divided, light or dark) in one place instead of four icons */
+function ViewMenu() {
+  const s = useApp();
+  const narrow = useNarrow();
+  const info = claudeOn() ? snapshotInfo() : null;
+  const worth = !!(info && info.cmp && info.cmp.worth);
+  const layouts = Object.keys(LAYOUTS);
+  return (
+    <PopMenu id="viewMenu" icon="layout" text="View" btnClass="btn btn-ghost btn-sm tb-view" title="Cheat sheet, layout and light or dark">
+      {({ close }) => (
+        <>
+          <button class="pop-item" id="cheatBtn" role="menuitem" aria-expanded={s.cheatOpen} aria-controls="cheatPanel" onClick={() => { close(); toggleCheat(); }}><Icon name="cheat" size={16} />Cheat sheet<span class="pop-hint">{s.cheatOpen ? 'open' : 'the rules at a glance'}</span></button>
+          {claudeOn() && !s.job && <button class={'pop-item' + (worth ? ' worth' : '')} id="snapBtn" role="menuitem" title={info ? describeSnapshot(info.snap, info.cmp) + (worth ? '. Worth refreshing.' : '') + ' Click to refresh it.' : 'No snapshot yet. Click to make one.'} onClick={() => { close(); set({ dialog: { kind: 'snapshot' } }); }}><Icon name="wand" size={16} />Snapshot of the campaign…{worth && <span class="snap-dot" aria-hidden="true" />}<span class="pop-hint">{worth ? 'worth refreshing' : info ? 'up to date' : 'not made yet'}</span></button>}
+          <div class="pop-sep" />
+          <div class="pop-label">Layout{narrow ? ' (needs a wider window)' : ''}</div>
+          {layouts.map(k => <button key={k} class={'pop-item' + (s.layout === k ? ' on' : '')} role="menuitemradio" aria-checked={s.layout === k} id={'viewLayout-' + k} disabled={narrow} onClick={() => { close(); setLayout(k); }}><span class="pop-check">{s.layout === k ? '✓' : ''}</span>{LAYOUTS[k].label}</button>)}
+          <button class="pop-item" id="viewTable" role="menuitem" disabled={narrow} onClick={() => { close(); tableMode(); }}><span class="pop-check" />Table mode<span class="pop-hint">session, party, NPCs</span></button>
+          <div class="pop-sep" />
+          <div class="pop-label">Colours</div>
+          {[['auto', 'Follow my Mac'], ['light', 'Light'], ['dark', 'Dark']].map(([k, label]) => <button key={k} class={'pop-item' + (s.theme === k ? ' on' : '')} role="menuitemradio" aria-checked={s.theme === k} id={'viewTheme-' + k} onClick={() => { close(); setTheme(k); }}><span class="pop-check">{s.theme === k ? '✓' : ''}</span>{label}</button>)}
+        </>
+      )}
+    </PopMenu>
   );
 }
 
@@ -235,10 +262,7 @@ export function Shell() {
           <div class="spacer" />
           <JobPill />
           <Island />
-          <div class="tb-solo"><CheatButton /></div>
-          <SnapshotButton />
-          <LayoutButton />
-          <ThemeToggle />
+          <ViewMenu />
           {pend > 0 && <button class="btn btn-ghost btn-sm tb-discard" onClick={() => set({ dialog: { kind: 'confirm', title: 'Discard all unpushed changes?', body: 'Every edit, new note and deletion since your last push will be thrown away. Your vault is not touched.', confirmLabel: 'Discard ' + pend + ' change' + (pend === 1 ? '' : 's'), danger: true, onConfirm: discardAll } })}>Discard all</button>}
           <button class={'btn tb-push' + (pend ? ' btn-primary has' : '')} disabled={!pend} onClick={startPush} id="pushBtn">{pend ? 'Push ' + pend + ' change' + (pend === 1 ? '' : 's') : 'Nothing to push'}</button>
         </div>

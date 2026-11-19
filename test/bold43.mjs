@@ -65,7 +65,7 @@ check('and the bar still pins to the top while the list scrolls', await pg.evalu
 
 // ---- the clock dials in Live
 await pg.evaluate(() => window.__dmforge.A.goto(window.__dmforge.getIndex().byType.session[0].path));
-await pg.waitForSelector(P + '#liveBtn'); await pg.click(P + '#liveBtn'); await pg.waitForSelector(P + '#livePanel');
+await pg.click(P + '#mode-run'); await pg.waitForSelector(P + '#liveBtn'); await pg.click(P + '#liveBtn'); await pg.waitForSelector(P + '#livePanel');
 const dials = await pg.evaluate(() => ({ pies: document.querySelectorAll('.pane:not([hidden]) .live-clock .pie').length, rows: document.querySelectorAll('.pane:not([hidden]) .live-clock').length, w: document.querySelector('.pane:not([hidden]) .live-clock .pie').getBoundingClientRect().width }));
 check('every Live clock has a dial', dials.rows >= 3 && dials.pies === dials.rows && dials.w >= 40, JSON.stringify(dials));
 const c0 = await pg.textContent(P + '.live-clock [data-count]');

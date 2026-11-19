@@ -1,0 +1,23 @@
+import { createRequire } from 'node:module';
+import path from 'node:path'; import url from 'node:url'; import fs from 'node:fs';
+const { chromium } = createRequire(import.meta.url)('playwright');
+const here = path.dirname(url.fileURLToPath(import.meta.url));
+const S = '/tmp/claude-0/-home-user-vuthyM/1d654b07-7e86-58fc-b4c9-13f1eaeef043/scratchpad/shots31/'; fs.mkdirSync(S, { recursive: true });
+const b = await chromium.launch({ args: ['--no-sandbox'] });
+const pg = await (await b.newContext({ viewport: { width: 1360, height: 900 }, colorScheme: 'dark' })).newPage();
+await pg.goto('file://' + path.join(here, '..', 'dist', 'DM-Forge.html'));
+await pg.evaluate(() => window.__dmforge.A.openPlainDemo());
+await pg.waitForFunction(() => document.querySelector('.sidebar') || /What is in/.test(document.body.innerText));
+if (await pg.locator('text=Looks good').count()) await pg.click('text=Looks good');
+await pg.waitForSelector('.sidebar');
+await pg.evaluate(() => document.querySelector('#navGenerate').click()); await pg.waitForSelector('.gen');
+await pg.screenshot({ path: S + '3-generate.png' });
+await pg.evaluate(() => document.querySelector('#navCombat').click()); await pg.waitForTimeout(300);
+await pg.screenshot({ path: S + '4-combat.png' });
+// find any select whose current text is cut off
+await pg.evaluate(() => document.querySelector('#navSettings').click());
+await pg.evaluate(() => document.querySelector('#menuSettings').click()); await pg.waitForTimeout(300);
+await pg.screenshot({ path: S + '5-settings.png' });
+const cut = await pg.evaluate(() => [...document.querySelectorAll('select')].filter(s => s.offsetParent && s.scrollWidth > s.clientWidth + 1).map(s => s.id || s.getAttribute('aria-label') || s.className).slice(0, 10));
+console.log('cut off:', JSON.stringify(cut));
+await b.close();

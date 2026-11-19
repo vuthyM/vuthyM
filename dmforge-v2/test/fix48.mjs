@@ -1,0 +1,80 @@
+/* 2.48: "Jump to it" jumps once (adding an NPC or coming back no longer scrolls the page), and Spotlight moments can be taken back. */
+import { createRequire } from 'node:module';
+import path from 'node:path'; import url from 'node:url';
+const { chromium } = createRequire(import.meta.url)('playwright');
+const here = path.dirname(url.fileURLToPath(import.meta.url));
+const results = [];
+const check = (name, cond, extra) => { results.push(!!cond); console.log((cond ? 'PASS ' : 'FAIL ') + name + (cond ? '' : '  ' + (extra ?? ''))); };
+const b = await chromium.launch({ args: ['--no-sandbox'] });
+const pg = await (await b.newContext({ viewport: { width: 1440, height: 900 } })).newPage();
+const errors = []; pg.on('pageerror', e => errors.push(e.message));
+await pg.goto('file://' + path.join(here, '..', 'dist', 'DM-Forge.html'));
+await pg.click('text=Try the demo vault');
+await pg.waitForSelector('.sidebar');
+const P = '.pane:not([hidden]) ';
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+const sess = await pg.evaluate(() => window.__dmforge.getIndex().byType.session[0].path);
+const A = (fn, ...args) => pg.evaluate(([fn, args]) => window.__dmforge.A[fn](...args), [fn, args]);
+await A('setCurrentSession', sess);
+await A('goto', sess); await pg.waitForSelector(P + '#noteTitle');
+/* the scrolling element of the note page */
+const top = () => pg.evaluate(() => Math.max(0, ...[...document.querySelectorAll('.pane:not([hidden]) *, .pane:not([hidden])')].concat([document.scrollingElement], [...document.querySelectorAll('main, .main, .content, .workspace')]).map(e => Math.round(e.scrollTop || 0))));
+const toTop = () => pg.evaluate(() => { for (const e of document.querySelectorAll('*')) if (e.scrollTop) e.scrollTop = 0; });
+const names = await pg.evaluate(() => window.__dmforge.getIndex().byType.npc.slice(0, 8).map(n => n.name));
+
+/* ---- Jump to it, once */
+await sleep(300);
+check('the note page starts at the top', (await top()) === 0, await top());
+await pg.evaluate(p => window.__dmforge.A.jumpToLine(p, 20), sess); await sleep(1500);
+const jumped = await top();
+check('a jump scrolls the page to the line', jumped > 150, jumped);
+await toTop(); await sleep(300);
+await A('addToSessionCast', sess, names[0], {}); await sleep(900);
+check('adding an NPC to the cast does not scroll the page after a jump', (await top()) === 0, await top());
+await A('addToSessionCast', sess, names[1], {}); await A('addToSessionCast', sess, names[2], {}); await sleep(900);
+check('nor does adding two more', (await top()) === 0, await top());
+await A('setSection', 'party'); await sleep(300);
+await A('goto', sess); await pg.waitForSelector(P + '#noteTitle'); await sleep(1200);
+check('leaving the session and coming back does not scroll to the old jump', (await top()) === 0, await top());
+await A('setSection', 'overview'); await sleep(200); await A('goto', sess); await pg.waitForSelector(P + '#noteTitle'); await sleep(1200);
+check('and again', (await top()) === 0, await top());
+await pg.evaluate(p => window.__dmforge.A.jumpToLine(p, 20), sess); await sleep(1500);
+check('a new jump still works', (await top()) > 150, await top());
+await toTop(); await sleep(200);
+await pg.evaluate(p => { const s = window.__dmforge.S; s.jump = { path: p, line: 20, stamp: Date.now() - 60000, open: true }; window.__dmforge.emit(); }, sess); await sleep(1200);
+check('a jump that is a minute old is ignored', (await top()) === 0, await top());
+
+/* ---- Spotlight: take a moment back */
+await A('setSection', 'party'); await pg.waitForSelector(P + '#spotlightCard');
+await pg.evaluate(() => { document.querySelector('.pane:not([hidden]) #spotlightCard').open = true; }); await sleep(100);
+const player = await pg.evaluate(() => document.querySelector('.pane:not([hidden]) #spotlightCard [data-spot]').dataset.spot);
+const count = () => pg.evaluate(n => { const r = document.querySelector('.pane:not([hidden]) #spotlightCard [data-spot="' + n + '"]'); return +(/(\d+) ·/.exec(r.textContent) || [])[1]; }, player);
+const base = await count();
+const row = P + '#spotlightCard [data-spot="' + player + '"] ';
+check('the card has an undo button, and one per player', await pg.locator(P + '#spotUndo').count() === 1 && await pg.locator(P + '#spotlightCard [data-spot-undo]').count() >= 2);
+const before = await pg.evaluate(() => window.__dmforge.S.working.list().length);
+await pg.click(row + '[data-spot-add]'); await pg.click(row + '[data-spot-add]'); await pg.click(row + '[data-spot-add]'); await sleep(200);
+check('three moments are added', (await count()) === base + 3, await count());
+await pg.click(row + '[data-spot-undo]'); await sleep(200);
+check('the minus takes one back', (await count()) === base + 2, await count());
+await pg.click(P + '#spotUndo'); await sleep(200);
+check('Undo last moment takes the newest one back', (await count()) === base + 1, await count());
+await pg.click(row + '[data-spot-undo]'); await sleep(200);
+check('and the last of them', (await count()) === base, await count());
+check('with none left in this session the minus is disabled', await pg.isDisabled(row + '[data-spot-undo]'));
+check('and the note is no longer a pending change', (await pg.evaluate(() => window.__dmforge.S.working.list().length)) === before, await pg.evaluate(() => window.__dmforge.S.working.list().length));
+/* it takes back the player's own moment, not somebody else's */
+const other = await pg.evaluate(p => [...document.querySelectorAll('.pane:not([hidden]) #spotlightCard [data-spot]')].map(e => e.dataset.spot).find(n => n !== p), player);
+const orow = P + '#spotlightCard [data-spot="' + other + '"] ';
+const obase = await pg.evaluate(n => +(/(\d+) ·/.exec(document.querySelector('.pane:not([hidden]) #spotlightCard [data-spot="' + n + '"]').textContent) || [])[1], other);
+await pg.click(row + '[data-spot-add]'); await pg.click(orow + '[data-spot-add]'); await sleep(150);
+await pg.click(row + '[data-spot-undo]'); await sleep(150);
+const ocount = await pg.evaluate(n => +(/(\d+) ·/.exec(document.querySelector('.pane:not([hidden]) #spotlightCard [data-spot="' + n + '"]').textContent) || [])[1], other);
+check('the minus on one player leaves the other player\'s moment', ocount === obase + 1 && (await count()) === base, ocount + ' ' + obase);
+await pg.click(P + '#spotUndo'); await sleep(150);
+check('and Undo last moment then clears that one', (await pg.evaluate(() => window.__dmforge.S.working.list().length)) === before);
+check('no page errors', errors.length === 0, errors.join(' | '));
+await b.close();
+const ok = results.filter(Boolean).length;
+console.log(ok + '/' + results.length + ' checks passed');
+process.exit(ok === results.length ? 0 : 1);

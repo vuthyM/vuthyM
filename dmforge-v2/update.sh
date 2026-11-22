@@ -23,7 +23,13 @@ main() {
   log() { printf '%s %s\n' "$(date '+%F %T')" "$*" >> "$LOG"; [ -t 1 ] && printf '%s\n' "$*"; return 0; }
 
   if [ "${1:-}" = "--status" ]; then
-    echo "Running: $(cat VERSION 2>/dev/null || echo unknown) ($(git rev-parse --short HEAD 2>/dev/null || echo no-git))"
+    files="$(cat VERSION 2>/dev/null || echo unknown)"
+    echo "Files on disk: $files ($(git rev-parse --short HEAD 2>/dev/null || echo no-git))"
+    inside="$(docker compose exec -T dmforge cat /app/VERSION 2>/dev/null | tr -d '\r\n')"
+    if [ -n "$inside" ]; then
+      echo "Running in the container: $inside"
+      [ "$inside" = "$files" ] || echo "  (the container is on an older build than the files; the next release or 'docker compose up -d --build' brings it up to date)"
+    fi
     docker compose ps 2>/dev/null | tail -n +1
     echo "--- last log lines"; tail -n 12 "$LOG" 2>/dev/null
     return 0

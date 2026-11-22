@@ -22,5 +22,5 @@ ENV DMFORGE_DATA=/data \
 RUN mkdir -p /data /export && chmod 777 /data /export
 VOLUME ["/data", "/export"]
 EXPOSE 8765
-HEALTHCHECK --interval=30s --timeout=5s --retries=3 CMD python -c "import urllib.request;urllib.request.urlopen('http://127.0.0.1:8765/healthz',timeout=4)"
+HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --start-interval=2s --retries=3 CMD python -c "import urllib.request;urllib.request.urlopen('http://127.0.0.1:8765/healthz',timeout=4)"
 CMD ["python", "-I", "dmforge_hosted.py"]

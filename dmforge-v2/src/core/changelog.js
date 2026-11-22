@@ -7,6 +7,12 @@ export const KINDS = { new: 'New', improved: 'Improved', fixed: 'Fixed' };
 
 export const CHANGELOG = [
   {
+    version: '2.55.1', date: '2026-11-22', title: 'The server updates itself',
+    changes: [
+      ['new', 'On your own server, DM Forge can now install new versions by itself within about a minute of one being released: it checks GitHub every minute (it only reaches out, nothing is opened), copies the database first, builds the new version while the old one keeps running, swaps it, and waits for it to be healthy. If the build fails or the new version does not come up healthy, the old version is put back and that release is skipped. ./update.sh --status shows what is running; the log is update.log. See deploy/DEPLOY-V3.md.'],
+    ],
+  },
+  {
     version: '2.55.0', date: '2026-11-22', title: 'Combat: the creature whose turn it is gets everything, the rest stay to a line',
     changes: [
       ['improved', 'During a fight, the creature whose turn it is has all its controls open (reaction, legendary actions, recharge, note, temp HP, conditions, stat block, remove). Every other creature is two lines: name, AC and conditions, then hit points with the amount box and Damage and Heal. A chevron on a row opens it when you need it. About a third of the buttons that used to be on screen.'],

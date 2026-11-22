@@ -34,7 +34,7 @@ with zipfile.ZipFile(OUT, 'w') as z:
     for f in sorted(os.listdir(os.path.join(ROOT, 'server'))):
         if f.endswith(('.py', '.js')):
             add(z, os.path.join(ROOT, 'server', f), TOP + 'source/server/' + f)
-    for f in ('Dockerfile', 'docker-compose.yml', '.dockerignore', '.env.example', 'package-lock.json', 'V3-PLAN.md'):
+    for f in ('Dockerfile', 'docker-compose.yml', '.dockerignore', '.env.example', 'package-lock.json', 'V3-PLAN.md', 'update.sh'):
         if os.path.exists(os.path.join(ROOT, f)):
             add(z, os.path.join(ROOT, f), TOP + 'source/' + f)
     add(z, os.path.join(ROOT, 'deploy', 'DEPLOY-V3.md'), TOP + 'source/deploy/DEPLOY-V3.md')

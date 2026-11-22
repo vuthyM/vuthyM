@@ -69,12 +69,20 @@ function Extras({ c, st }) {
   );
 }
 
+/* How much of each row is shown. 'focus' (the default): the creature whose turn it is has everything open, the others are one line plus
+   the amount box; the chevron opens any row. 'all' shows everything on every row, as before. Remembered in this browser. */
+const ROWS_KEY = 'dmforge:combat-rows';
+export const rowsMode = () => { try { return localStorage.getItem(ROWS_KEY) === 'all' ? 'all' : 'focus'; } catch (e) { return 'focus'; } };
+function setRowsMode(m) { try { localStorage.setItem(ROWS_KEY, m); } catch (e) { /* storage unavailable */ } set({}); }
+
 /* Initiative is a text box with its own arrow-key handling (not type=number) so the
    caret can be put back after the row moves. Every valid value re-sorts the list at once. */
-function CombatRow({ c, active, typed }) {
+function CombatRow({ c, active, typed, mode }) {
   const [amt, setAmt] = useState('');
   const [draft, setDraft] = useState(null);
+  const [open, setOpen] = useState(false);
   const st = S.combat;
+  const expanded = mode === 'all' || active || open;
   const pct = c.maxHp ? Math.max(0, Math.min(100, Math.round((c.hp / c.maxHp) * 100))) : 0;
   const apply = fn => { const a = num(amt); if (!a) return; fn(st, c.id, a); setAmt(''); saveCombat(); };
   const setInit = v => { typed(c.id); C.setInit(st, c.id, v); saveCombat(); };
@@ -92,25 +100,28 @@ function CombatRow({ c, active, typed }) {
       setInit(next);
     } else if (e.key === 'Enter') e.currentTarget.blur();
   };
+  const lockedOpen = mode === 'all' || active;
   return (
-    <div class={'c-row' + (active ? ' turn' : '') + (C.isDown(c) ? ' down' : '')} data-cid={c.id}>
+    <div class={'c-row' + (active ? ' turn' : '') + (C.isDown(c) ? ' down' : '') + (expanded ? ' open' : '')} data-cid={c.id}>
       <div class="c-initcol">
         <input class="c-init" type="text" inputmode="numeric" autocomplete="off" data-init={c.id} value={draft ?? c.init}
           aria-label={'Initiative for ' + c.name + ' (up and down arrows change it)'}
           onFocus={e => e.currentTarget.select()} onInput={onInit} onKeyDown={onKey} onBlur={() => setDraft(null)} />
-        {!c.pc && <button class="mini roll" title={'Roll initiative for ' + c.name + (c.bonus ? ' (d20 ' + (c.bonus > 0 ? '+' : '') + c.bonus + ')' : ' (d20)')} aria-label={'Roll initiative for ' + c.name}
-          onClick={() => { typed(null); C.rollFor(st, c.id); saveCombat(); }}>
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.5 3.5 7.5v9l8.5 5 8.5-5v-9z" /><path d="M12 2.5v19M3.5 7.5 12 12l8.5-4.5" /></svg>
-        </button>}
       </div>
-      <div>
+      <div class="c-main">
         <div class="c-name">
           <span data-peek={c.name}>{c.name}</span>
           {c.pc && <span class="pill pill-good">PC</span>}
           {c.ac != null && <span class="pill">AC {c.ac}</span>}
+          {!c.pc && <button class="mini roll" title={'Roll initiative for ' + c.name + (c.bonus ? ' (d20 ' + (c.bonus > 0 ? '+' : '') + c.bonus + ')' : ' (d20)')} aria-label={'Roll initiative for ' + c.name}
+            onClick={() => { typed(null); C.rollFor(st, c.id); saveCombat(); }}>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.5 3.5 7.5v9l8.5 5 8.5-5v-9z" /><path d="M12 2.5v19M3.5 7.5 12 12l8.5-4.5" /></svg>
+          </button>}
           {C.isDown(c) && <span class="pill pill-bad">{C.deathState(c) === 'dead' ? 'Dead' : 'Down'}</span>}
           {c.temp > 0 && <span class="pill" data-temp={c.id}>+{c.temp} temp</span>}
           {c.conds.map(k => <span key={k} class="pill pill-warn" data-rule={k} tabIndex={0}>{k}</span>)}
+          {!expanded && c.reaction && <span class="pill" title="Has used its reaction this round">Reaction used</span>}
+          {!expanded && c.note && <span class="c-note-line small muted" title={c.note}>{c.note}</span>}
         </div>
         <div class="c-hp">
           <span class="mono">{c.hp}/{c.maxHp}</span>
@@ -119,19 +130,28 @@ function CombatRow({ c, active, typed }) {
             onKeyDown={e => { if (e.key === 'Enter') apply(C.damage); }} />
           <button class="btn btn-sm btn-danger" onClick={() => apply(C.damage)}>Damage</button>
           <button class="btn btn-sm" onClick={() => apply(C.heal)}>Heal</button>
-          <button class="btn btn-sm" data-temp-btn={c.id} title="Temporary hit points: you keep the larger number, and damage uses them first" onClick={() => apply(C.setTemp)}>Temp</button>
-          {c.temp > 0 && <button class="btn btn-sm btn-ghost" aria-label={'Clear the temporary hit points of ' + c.name} onClick={() => { C.clearTemp(st, c.id); saveCombat(); }}>×</button>}
         </div>
         {C.deathState(c) && <DeathSaves c={c} st={st} />}
-        <Extras c={c} st={st} />
-        <details>
-          <summary class="small muted" style="cursor:pointer;margin-top:4px">Conditions{c.conds.length ? ' (' + c.conds.length + ')' : ''}</summary>
-          <div class="cond-row">
-            {C.CONDITIONS.map(k => <button key={k} class="cond" data-rule={k} aria-pressed={c.conds.includes(k)} onClick={() => { C.toggleCondition(st, c.id, k); saveCombat(); }}>{k}</button>)}
+        {expanded && (
+          <div class="c-more">
+            <Extras c={c} st={st} />
+            <div class="c-more-row">
+              <button class="btn btn-sm" data-temp-btn={c.id} title="Temporary hit points from the amount box: you keep the larger number, and damage uses them first" onClick={() => apply(C.setTemp)}>Temp HP</button>
+              {c.temp > 0 && <button class="btn btn-sm btn-ghost" aria-label={'Clear the temporary hit points of ' + c.name} onClick={() => { C.clearTemp(st, c.id); saveCombat(); }}>Clear temp</button>}
+              <details class="c-conds">
+                <summary class="small muted">Conditions{c.conds.length ? ' (' + c.conds.length + ')' : ''}</summary>
+                <div class="cond-row">
+                  {C.CONDITIONS.map(k => <button key={k} class="cond" data-rule={k} aria-pressed={c.conds.includes(k)} onClick={() => { C.toggleCondition(st, c.id, k); saveCombat(); }}>{k}</button>)}
+                </div>
+              </details>
+              <button class="btn btn-sm btn-ghost c-remove" aria-label={'Remove ' + c.name} onClick={() => { C.removeCombatant(st, c.id); saveCombat(); }}>Remove</button>
+            </div>
           </div>
-        </details>
+        )}
       </div>
-      <button class="btn btn-sm btn-ghost" aria-label={'Remove ' + c.name} onClick={() => { C.removeCombatant(st, c.id); saveCombat(); }}>Remove</button>
+      <button class="mini c-toggle" aria-expanded={expanded} aria-label={(expanded ? 'Hide' : 'Show') + ' the other controls for ' + c.name} title={lockedOpen ? 'Open while it is this creature’s turn' : (expanded ? 'Hide the other controls' : 'Reaction, note, conditions, temp HP, stat block, remove')} disabled={lockedOpen} onClick={() => setOpen(!open)}>
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6" /></svg>
+      </button>
     </div>
   );
 }
@@ -183,7 +203,7 @@ function CombatList({ st }) {
   });
   return (
     <div ref={ref} class="c-list" id="combatList">
-      {st.combatants.map((c, i) => <CombatRow key={c.id} c={c} active={i === st.turn} typed={typed} />)}
+      {st.combatants.map((c, i) => <CombatRow key={c.id} c={c} active={i === st.turn} typed={typed} mode={rowsMode()} />)}
     </div>
   );
 }
@@ -415,6 +435,7 @@ export function CombatPage() {
       </div>
       <div class="combat-grid">
         <div>
+          {st.combatants.length > 1 && <div class="c-listbar"><button class="btn btn-sm btn-ghost" id="combatRowsToggle" title={rowsMode() === 'all' ? 'Show only the current turn in full; the other rows open with their chevron' : 'Show every control on every row'} onClick={() => setRowsMode(rowsMode() === 'all' ? 'focus' : 'all')}>{rowsMode() === 'all' ? 'Focus on the current turn' : 'Show all details'}</button></div>}
           {st.combatants.length ? <CombatList st={st} /> : <Empty title="Nobody is in the fight yet">Add the party or a monster on the right.</Empty>}
         </div>
         <SidePanel st={st} />

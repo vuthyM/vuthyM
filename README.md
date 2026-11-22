@@ -279,6 +279,12 @@ open folders directly; use the helper.
   too. The bar with Next turn, Undo, Roll for enemies and End combat stays pinned while you scroll, and so does the right-hand panel; *Next turn* scrolls
   to the active creature. *Delete combat* is in the End combat window.
 
+## Combat while a fight is running
+
+The creature whose turn it is has every control open; the others are a name line and a hit-point line with the amount box and Damage / Heal.
+A chevron on a row opens it (reaction, legendary actions, recharge, note, temp HP, conditions, stat block, remove). Conditions, temp HP, "Reaction used",
+the note and death saves show without opening. **Show all details** above the list opens every row; it is remembered in this browser.
+
 ## Layouts and panes
 
 The **Layout** button (top bar) divides the window into panes, each with its own row of tabs, like Obsidian:

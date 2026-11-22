@@ -7,6 +7,15 @@ export const KINDS = { new: 'New', improved: 'Improved', fixed: 'Fixed' };
 
 export const CHANGELOG = [
   {
+    version: '2.55.0', date: '2026-11-22', title: 'Combat: the creature whose turn it is gets everything, the rest stay to a line',
+    changes: [
+      ['improved', 'During a fight, the creature whose turn it is has all its controls open (reaction, legendary actions, recharge, note, temp HP, conditions, stat block, remove). Every other creature is two lines: name, AC and conditions, then hit points with the amount box and Damage and Heal. A chevron on a row opens it when you need it. About a third of the buttons that used to be on screen.'],
+      ['improved', 'What matters stays visible without opening a row: conditions, temp HP, "Reaction used", the note ("Concentrating on Bless"), and death saves for a player at 0. The current turn is plainly marked, and Next turn moves the open controls along.'],
+      ['new', '"Show all details" above the list opens every row (the old layout); it is remembered in this browser.'],
+      ['improved', 'The roll-initiative button sits beside the name instead of under the number, and Temp HP and Remove moved inside the open controls.'],
+    ],
+  },
+  {
     version: '2.54.0', date: '2026-11-22', title: 'Prepared encounters you did not get to move to the next session',
     changes: [
       ['new', 'Running a prepared encounter in Combat now writes a dated line inside it ("Ran in combat: 2026-11-22"), so the note shows what was used. Its card shows "Ran …" and the button becomes "Run again".'],

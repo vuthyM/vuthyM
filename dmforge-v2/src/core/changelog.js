@@ -7,6 +7,16 @@ export const KINDS = { new: 'New', improved: 'Improved', fixed: 'Fixed' };
 
 export const CHANGELOG = [
   {
+    version: '2.58.0', date: '2026-11-22', title: 'Import dungeons from DMAtlas',
+    changes: [
+      ['new', 'Import a dungeon from DMAtlas (Maps page, the command palette, or Settings, Data). Pick a published dungeon, read what it will do, and import: one note named after the dungeon in a Dungeons folder, with a section for every room ("## 2.1. The Hall"), and one map note per level with its picture and a pin for every room. Multi-level dungeons keep every level in the same note. The server fetches and checks the pictures itself (a real PNG, no bigger than 15 MB or 16384 pixels, matching the hash DMAtlas gave) and stores them under the campaign\'s Maps folder, so they are in your backups and the Markdown export.'],
+      ['new', 'DMAtlas owns the geometry and DM Forge owns the writing. A room\'s starter text is used once, when its section is first made; after that nothing under a heading is ever changed. Importing again finds rooms only by a hidden marker: a moved room moves its pin, a renamed room changes just its heading line and its pin\'s link, a new room gets a section and a pin, and a room DMAtlas no longer has is flagged "Removed in DMAtlas" (never deleted). Importing with nothing changed changes nothing, and an unchanged picture is not downloaded again.'],
+      ['improved', 'Map pins can point at a heading in a note ([[Rift Keep#2.1. The Hall]]). The anchor now survives saving and reloading, the pin is named for its room, and "Open the room" on its card (or double-clicking the pin) opens the note at that section.'],
+      ['improved', 'Secret rooms stay out of player-safe copies: their sections are taken out of the dungeon note, their pins out of the map, and the hidden markers out of both. A pin you mark secret in the map view takes its section out too.'],
+      ['improved', 'Everything an import changes is an ordinary unpushed change, so Push, Discard all and Undo last push cover it. If DMAtlas cannot be reached or sends something wrong, the import stops with a plain message and changes nothing. Setup: DMFORGE_DMATLAS_URL in .env and `docker compose exec dmforge python -I dmforge_atlas.py` to check the connection (see deploy/DEPLOY-V3.md).'],
+    ],
+  },
+  {
     version: '2.57.1', date: '2026-11-22', title: 'Tide: a deeper blue',
     changes: [
       ['improved', 'Tide is a little deeper: the dark navy is darker and richer (background, cards, raised areas and borders), and the light theme\'s navy ink is a touch deeper too. The cream text and the rust accent are unchanged, and every text colour is still checked for readability.'],

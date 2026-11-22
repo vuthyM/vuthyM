@@ -786,7 +786,7 @@ export function MapsPage() {
   const sel = tab.selected && idx.byPath.get(tab.selected);
   return (
     <>
-      <div class="page-head"><h2 aria-level="1">Maps</h2></div>
+      <div class="page-head"><h2 aria-level="1">Maps</h2>{s.hosted && <button class="btn btn-sm" id="atlasBtn" title="Bring a dungeon over from DMAtlas: its picture and a pin for every room" onClick={() => set({ dialog: { kind: 'atlas' } })}>Import from DMAtlas…</button>}</div>
       {!imgs.length ? <Empty title="No images found">Images in your campaign folder (png, jpg, webp, svg…) appear here.</Empty> : (
         <>
         <div class="muted small" style="margin:-8px 0 12px">Click an image to enlarge it. Choose “Open in a tab” (or Ctrl/⌘-click) to keep it open next to your notes.</div>

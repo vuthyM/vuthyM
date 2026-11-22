@@ -14,8 +14,11 @@
      - 10, 80 — Old bridge — a rotten plank, third from the left
 
    A pin is a position (percent across, percent down), then a [[place]] or a plain label, then optional `secret` and a note.
+   A link can point at a heading in a note ([[Rift Keep#2.1. The Hall]]); that anchor is kept when a pin is read and written, and clicking
+   the pin opens the note at that section. A pin made by the DMAtlas import also ends with a hidden marker (<!-- room:ID -->) so the
+   next import finds it again even if the heading was renamed.
    Because the places are ordinary [[links]], renaming a place updates its pins and Obsidian shows them as links. */
-import { splitFrontmatter } from './frontmatter.js';
+import { splitFrontmatter, serializeKV } from './frontmatter.js';
 
 export const PINS_HEADING = 'Pins';
 const oneLine = s => String(s || '').replace(/\s+/g, ' ').trim();
@@ -25,34 +28,40 @@ const stemOf = p => base(p).replace(/\.[^.]+$/, '');
 const sameName = (a, b) => base(a).toLowerCase() === base(b).toLowerCase();
 
 /* ---------- pins ---------- */
+const ROOM_MARK = /\s*<!--\s*room:([A-Za-z0-9._:-]{1,64})\s*-->\s*$/;
 export function parsePins(body) {
   const lines = String(body || '').split(/\r?\n/);
   const i = lines.findIndex(l => new RegExp('^##\\s+' + PINS_HEADING + '\\s*$', 'i').test(l));
   if (i < 0) return [];
   const out = [];
   for (let j = i + 1; j < lines.length; j++) {
-    const l = lines[j];
+    let l = lines[j];
     if (/^#{1,2}\s/.test(l)) break;
+    let roomId = '';
+    const rm = ROOM_MARK.exec(l);
+    if (rm) { roomId = rm[1]; l = l.slice(0, rm.index); }
     const m = /^\s*[-*]\s+(\d{1,3}(?:\.\d+)?)\s*[,;]\s*(\d{1,3}(?:\.\d+)?)\s*(?:[—–-]+\s*(.*))?$/.exec(l);
     if (!m) continue;
     const parts = (m[3] || '').split(/\s+[—–]\s+/).map(oneLine).filter(Boolean);
-    let place = '', label = '', secret = false;
+    let place = '', heading = '', label = '', secret = false;
     const notes = [];
     parts.forEach((p, k) => {
       if (/^secret$/i.test(p)) { secret = true; return; }
-      const lk = /^\[\[([^\]|#]+)(?:[#|][^\]]*)?\]\]$/.exec(p);
-      if (k === 0 && lk) place = oneLine(lk[1]);
+      const lk = /^\[\[([^\]|#]+)(?:#([^\]|]*))?(?:\|[^\]]*)?\]\]$/.exec(p);
+      if (k === 0 && lk) { place = oneLine(lk[1]); heading = oneLine(lk[2] || ''); }
       else if (k === 0) label = p;
       else notes.push(p);
     });
-    out.push({ x: clamp(parseFloat(m[1])), y: clamp(parseFloat(m[2])), place, label, secret, note: notes.join(' — ') });
+    out.push({ x: clamp(parseFloat(m[1])), y: clamp(parseFloat(m[2])), place, heading, label, secret, note: notes.join(' — '), roomId });
   }
   return out;
 }
-export const pinTitle = p => p.place || p.label || 'Pin';
+/* a pin that points at a heading is named for it ("2.1. The Hall"), not for the note it is in */
+export const pinTitle = p => p.heading || p.place || p.label || 'Pin';
 export function pinLine(p) {
-  const what = p.place ? '[[' + oneLine(p.place) + ']]' : oneLine(p.label) || 'Pin';
-  return '- ' + clamp(p.x) + ', ' + clamp(p.y) + ' — ' + what + (p.secret ? ' — secret' : '') + (p.note ? ' — ' + oneLine(p.note) : '');
+  const what = p.place ? '[[' + oneLine(p.place) + (p.heading ? '#' + oneLine(p.heading) : '') + ']]' : oneLine(p.label) || 'Pin';
+  const mark = p.roomId && /^[A-Za-z0-9._:-]{1,64}$/.test(p.roomId) ? ' <!-- room:' + p.roomId + ' -->' : '';
+  return '- ' + clamp(p.x) + ', ' + clamp(p.y) + ' — ' + what + (p.secret ? ' — secret' : '') + (p.note ? ' — ' + oneLine(p.note) : '') + mark;
 }
 const replacePins = (body, pins) => {
   const all = body.split('\n');
@@ -73,7 +82,25 @@ export function mapNoteText(imagePath, pins = [], props = {}) {
   const fm = ['type: map', 'image: ' + (/[:#]/.test(name) ? JSON.stringify(name) : name)];
   if (props.place) fm.push('place: ' + JSON.stringify('[[' + props.place + ']]'));
   if (props.scale) fm.push('scale: ' + props.scale);
-  return '---\n' + fm.join('\n') + '\n---\n# ' + stem + '\n\n![[' + name + ']]\n\n' + replacePins('', pins).replace(/^\n+/, '');
+  for (const [k, v] of Object.entries(props.extra || {})) if (v !== undefined && v !== null && v !== '') fm.push(...serializeKV(k, v));
+  return '---\n' + fm.join('\n') + '\n---\n# ' + oneLine(props.title || stem) + '\n\n![[' + name + ']]\n\n' + replacePins('', pins).replace(/^\n+/, '');
+}
+
+/* the line (0-based, in the note's body) a heading is on, for a link like [[Note#2.1. The Hall]]. Case and spacing are not compared,
+   and a hidden marker at the end of the heading (<!-- room:ID -->) is ignored. -1 when there is no such heading. */
+export function headingLine(body, heading) {
+  const norm = t => String(t || '').replace(/<!--[\s\S]*?-->/g, '').replace(/\s+/g, ' ').trim().toLowerCase();
+  const want = norm(heading);
+  if (!want) return -1;
+  const lines = String(body || '').split(/\r?\n/);
+  let fence = false;
+  for (let i = 0; i < lines.length; i++) {
+    if (/^\s*(```|~~~)/.test(lines[i])) { fence = !fence; continue; }
+    if (fence) continue;
+    const m = /^#{1,6}\s+(.*?)\s*#*\s*$/.exec(lines[i]);
+    if (m && norm(m[1]) === want) return i;
+  }
+  return -1;
 }
 
 /* ---------- finding maps ---------- */

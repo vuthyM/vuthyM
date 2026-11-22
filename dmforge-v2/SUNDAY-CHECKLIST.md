@@ -12,7 +12,7 @@ What I **cannot** see from here is your Mac, Brave, your real vault and Obsidian
 - [ ] Quit any old helper window (the Terminal one). Only ever run **one** helper: a second one picks a new port, and then your unpushed notes and your fight stay on the first one.
 - [ ] Unzip the new version. First time only: right-click `Start DM Forge.command`, **Open**, **Open**.
 - [ ] Terminal shows a link starting `http://127.0.0.1:8765/?t=`. Open it in **Brave**.
-- [ ] **Menu** shows version **2.57.1** (at the bottom of the sidebar).
+- [ ] **Menu** shows version **2.58.0** (at the bottom of the sidebar).
 - [ ] Your real campaign opens. Counts look right (NPCs, Players, Sessions). The top bar says nothing is pending.
 
 ## 3. Things that depend on a Mac (5 minutes)

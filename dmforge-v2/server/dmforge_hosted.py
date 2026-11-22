@@ -35,6 +35,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 from dmforge_db import Store, StoreError, Conflict  # noqa: E402
 import dmforge_io  # noqa: E402
+from dmforge_atlas import Atlas, AtlasError, SHA_RE, check_dest, check_png, parse_base  # noqa: E402
 
 MAX_WRITE = 20 * 1024 * 1024
 COOKIE = 'dmf_session'
@@ -99,6 +100,7 @@ class State:
     fails = {}
     fail_lock = threading.Lock()
     version = ''
+    atlas = None
 
 
 def app_version():
@@ -229,6 +231,8 @@ class Handler(BaseHTTPRequestHandler):
                                     'conflict': c.kind, 'path': c.path, 'current': cur})
         except StoreError as e:
             return self._json(e.status, {'error': e.message})
+        except AtlasError as e:
+            return self._json(e.status, {'error': e.message})
         except Exception as e:  # keep the server alive; report the problem to the app
             if State.verbose:
                 import traceback
@@ -276,6 +280,38 @@ class Handler(BaseHTTPRequestHandler):
         cookie = '%s=%s; Path=/; Max-Age=31536000; HttpOnly; SameSite=Strict%s' % (COOKIE, State.session, '; Secure' if self._secure() else '')
         return self._send(303, b'', 'text/plain', {'Location': '/', 'Set-Cookie': cookie})
 
+    # ---- DMAtlas ----
+    def _atlas_off(self):
+        raise AtlasError(503, 'DMAtlas is not set up on this server. Set DMFORGE_DMATLAS_URL (see deploy/DEPLOY-V3.md).')
+
+    def _atlas_image(self):
+        """Fetches a level's picture from DMAtlas (here on the server, never through the browser), checks it, and stores it."""
+        if not State.atlas or not State.atlas.configured:
+            self._atlas_off()
+        try:
+            req = json.loads(self._body.decode('utf-8') or '{}')
+        except ValueError:
+            raise StoreError(400, 'That request was not valid.')
+        if not isinstance(req, dict):
+            raise StoreError(400, 'That request was not valid.')
+        dest = check_dest(req.get('dest'))
+        sha = req.get('sha256')
+        if not isinstance(sha, str) or not SHA_RE.match(sha):
+            raise AtlasError(400, 'That is not a picture hash.')
+        s = State.store
+        try:
+            have = s.read(dest)[0]
+        except StoreError:
+            have = None
+        if have is not None:
+            if hashlib.sha256(have).hexdigest() != sha:
+                raise StoreError(409, 'A different picture is already stored at that path.')
+            w, h = check_png(have)       # the picture has not changed: nothing is downloaded again
+            return {'path': dest, 'stored': False, 'skipped': True, 'bytes': len(have), 'width': w, 'height': h, 'sha256': sha}
+        data, w, h = State.atlas.image(req.get('mapId'), sha)
+        r = s.write_image(dest, data, device=self._q1('device')[:60])
+        return {'path': dest, 'stored': r['stored'], 'skipped': False, 'bytes': len(data), 'width': w, 'height': h, 'sha256': sha}
+
     # ---- API ----
     def _q1(self, key, default=''):
         return (getattr(self, '_q', {}).get(key) or [default])[0]
@@ -301,6 +337,15 @@ class Handler(BaseHTTPRequestHandler):
             raise StoreError(501, 'Claude is not set up on this server yet.')
         if op in ('update-info', 'update-install', 'rollback-info', 'rollback', 'rollforward'):
             raise StoreError(404, 'The server is updated by replacing its Docker image, not from inside the app.')
+        if op == 'atlas-status':
+            a = State.atlas
+            return self._json(200, {'configured': bool(a and a.configured), 'base': a.base if a and a.configured else ''})
+        if op == 'atlas-dungeons':
+            return self._json(200, State.atlas.dungeons() if State.atlas else self._atlas_off())
+        if op == 'atlas-dungeon':
+            return self._json(200, State.atlas.dungeon(self._q1('id')) if State.atlas else self._atlas_off())
+        if op == 'atlas-image' and post:
+            return self._json(200, self._atlas_image())
         if op == 'undo-info':
             return self._json(200, s.undo_info())
         if op == 'undo-push' and post:
@@ -382,7 +427,7 @@ def start_nightly(data_dir, export_dir, hour, keep, stop):
     return t
 
 
-def make_server(data_dir, app_path, bind='127.0.0.1', port=8765, name='DM Forge', hosts=(), token=None, verbose=False):
+def make_server(data_dir, app_path, bind='127.0.0.1', port=8765, name='DM Forge', hosts=(), token=None, verbose=False, dmatlas_url=''):
     State.store = Store(os.path.join(data_dir, 'dmforge.db'))
     State.token = token or load_token(data_dir)[0]
     State.session = session_value(State.token)
@@ -391,6 +436,7 @@ def make_server(data_dir, app_path, bind='127.0.0.1', port=8765, name='DM Forge'
     State.hosts = tuple(h.strip().lower() for h in hosts if h.strip())
     State.verbose = verbose
     State.fails = {}
+    State.atlas = Atlas(dmatlas_url)
     srv = ThreadingHTTPServer((bind, port), Handler)
     srv.daemon_threads = True
     return srv
@@ -407,6 +453,7 @@ def main(argv=None):
     ap.add_argument('--export-dir', default=os.environ.get('DMFORGE_EXPORT_DIR', ''), help='where the nightly Markdown export goes (empty: no export)')
     ap.add_argument('--backup-hour', type=int, default=int(os.environ.get('DMFORGE_BACKUP_HOUR', '3')), help='local hour of the nightly backup')
     ap.add_argument('--backup-keep', type=int, default=int(os.environ.get('DMFORGE_BACKUP_KEEP', '14')), help='how many nightly database copies to keep')
+    ap.add_argument('--dmatlas-url', default=os.environ.get('DMFORGE_DMATLAS_URL', ''), help='where DMAtlas publishes dungeons, for the importer (empty: the importer is off)')
     ap.add_argument('--show-token', action='store_true', help='print the access token and exit')
     ap.add_argument('--verbose', action='store_true')
     a = ap.parse_args(argv)
@@ -414,7 +461,11 @@ def main(argv=None):
     if a.show_token:
         print(token)
         return 0
-    srv = make_server(a.data, a.app, a.bind, a.port, a.name, a.hosts.split(','), token, a.verbose)
+    try:
+        parse_base(a.dmatlas_url)
+    except ValueError as e:
+        raise SystemExit(str(e))
+    srv = make_server(a.data, a.app, a.bind, a.port, a.name, a.hosts.split(','), token, a.verbose, a.dmatlas_url)
     start_nightly(a.data, a.export_dir, a.backup_hour % 24, a.backup_keep, threading.Event())
     if fresh:
         print('Your DM Forge access token (shown once; read it again with --show-token): %s' % token, flush=True)

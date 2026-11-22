@@ -306,6 +306,24 @@ class Store:
             self._noted_wrote(push, path, data)
             return {'version': version, 'mtime': mtime, 'changed': True}
 
+    def write_image(self, rel, data, device=''):
+        """Stores a PNG (only the DMAtlas importer does this, after checking it). The path is kept under a Maps folder as .png, so the
+        general rule that only notes can be written through the API still holds. -> {'stored': bool, 'version': n}; storing the same
+        bytes again changes nothing."""
+        path = clean_path(rel)
+        parts = path.split('/')
+        if not path.lower().endswith('.png') or 'Maps' not in parts[:-2] or any(p.startswith('.') for p in parts):
+            raise StoreError(400, 'Pictures are stored under a Maps folder, as .png.')
+        data = bytes(data)
+        if len(data) > 15 * 1024 * 1024:
+            raise StoreError(400, 'That picture is too large.')
+        with self._tx():
+            row = self._row(path)
+            if row is not None and bytes(row['content'] or b'') == data:
+                return {'stored': False, 'version': row['version']}
+            r = self.write(path, data, device=device, action='import', md_only=False)
+            return {'stored': True, 'version': r['version']}
+
     def trash(self, rel, base=None, push=None, device=''):
         """Moves a note to the trash. It can be restored; its history stays."""
         path = clean_md_path(rel)

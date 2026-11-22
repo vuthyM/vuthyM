@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState } from 'preact/hooks';
 import { useApp, getIndex, set, toast } from './store.js';
 import { assetUrl } from './common.jsx';
-import { saveMap, openMapAt, goto, openAssetTab } from './actions.js';
+import { saveMap, openMapAt, goto, openAssetTab, jumpToLine } from './actions.js';
 import { locationTree, hereOf } from '../core/locations.js';
-import { parsePins, pinTitle, placeOf, parseScale, metresBetween, scaleFromLine, fmtDistance, walkingTime, scaleFromMetres, mapNoteFor, mapsOfPlace } from '../core/maps.js';
+import { parsePins, pinTitle, headingLine, placeOf, parseScale, metresBetween, scaleFromLine, fmtDistance, walkingTime, scaleFromMetres, mapNoteFor, mapsOfPlace } from '../core/maps.js';
 import { subtitle } from './notes.jsx';
 import { basename } from '../core/util.js';
 
@@ -121,6 +121,14 @@ export function MapViewer({ path }) {
     };
     window.addEventListener('pointermove', mv); window.addEventListener('pointerup', up);
   };
+  /* a pin that points at a section ([[Rift Keep#2.1. The Hall]]) opens that note at the section */
+  const openPin = pin => {
+    const target = pin && pin.place ? idx.resolve(pin.place) : null;
+    if (!target) return;
+    goto(target.path, { newTab: true });
+    const line = pin.heading ? headingLine(target.body, pin.heading) : -1;
+    if (line >= 0) jumpToLine(target.path, line);
+  };
   const patchPin = (i, patch) => savePins(pins.map((p, k) => (k === i ? { ...p, ...patch } : p)));
   const removePin = i => { savePins(pins.filter((_, k) => k !== i)); setSel(-1); };
   const cur = sel >= 0 ? pins[sel] : null;
@@ -169,7 +177,7 @@ export function MapViewer({ path }) {
               const linked = p.place && idx.resolve(p.place);
               const hasMap = linked && mapsOfPlace(idx, linked).length > 0;
               return (
-                <button key={i} class={'map-pin' + (p.secret ? ' secret' : '') + (sel === i ? ' on' : '') + (hasMap ? ' has-map' : '') + (p.place && !linked ? ' missing' : '')} data-pin={pinTitle(p)} title={pinTitle(p)} style={'left:' + p.x + '%;top:' + p.y + '%'} onPointerDown={e => down(e, i)} onClick={e => e.stopPropagation()} aria-label={pinTitle(p) + (p.secret ? ' (secret)' : '')}>
+                <button key={i} class={'map-pin' + (p.secret ? ' secret' : '') + (sel === i ? ' on' : '') + (hasMap ? ' has-map' : '') + (p.place && !linked ? ' missing' : '')} data-pin={pinTitle(p)} title={pinTitle(p)} style={'left:' + p.x + '%;top:' + p.y + '%'} onPointerDown={e => down(e, i)} onClick={e => e.stopPropagation()} onDblClick={e => { e.stopPropagation(); openPin(p); }} aria-label={pinTitle(p) + (p.secret ? ' (secret)' : '')}>
                   <i />{labels && <span class={'map-pin-label' + (shownLabels.has(i) ? '' : ' lbl-off')}>{pinTitle(p)}</span>}
                 </button>
               );
@@ -220,13 +228,13 @@ export function MapViewer({ path }) {
           {cur && !drag && (
             <div class="map-card" id="mapCard">
               <div class="map-card-title">
-                {curPlace ? <a href="#" onClick={e => { e.preventDefault(); goto(curPlace.path, { newTab: true }); }}><b>{cur.place}</b></a> : <b>{cur.place || cur.label}</b>}
+                {curPlace ? <a href="#" onClick={e => { e.preventDefault(); openPin(cur); }}><b>{cur.heading || cur.place}</b></a> : <b>{cur.place || cur.label}</b>}
                 {cur.secret && <span class="pill pill-warn">Secret</span>}
               </div>
-              {curPlace && <div class="small muted">{subtitle(curPlace) || 'Place'}{here && here.people.length ? ' · ' + here.people.length + ' people here' : ''}</div>}
+              {curPlace && <div class="small muted">{cur.heading ? 'In ' + curPlace.name : subtitle(curPlace) || 'Place'}{here && here.people.length ? ' · ' + here.people.length + ' people here' : ''}</div>}
               {cur.place && !curPlace && <div class="small cc-bad">No place has this name any more.</div>}
               <div class="row-actions" style="margin-top:8px">
-                {curPlace && <button class="btn btn-sm" id="mapOpenPlace" onClick={() => goto(curPlace.path, { newTab: true })}>Open the place</button>}
+                {curPlace && <button class="btn btn-sm" id="mapOpenPlace" onClick={() => openPin(cur)}>{cur.heading ? 'Open the room' : 'Open the place'}</button>}
                 {curMaps.length > 0 && <button class="btn btn-sm btn-primary" id="mapOpenMap" onClick={() => openAssetTab(curMaps[0].image)}>Open its map</button>}
                 <button class="btn btn-sm" id="mapSecret" onClick={() => patchPin(sel, { secret: !cur.secret })}>{cur.secret ? 'Make it public' : 'Mark secret'}</button>
                 <button class="btn btn-sm btn-ghost btn-danger" id="mapRemove" onClick={() => removePin(sel)}>Remove pin</button>

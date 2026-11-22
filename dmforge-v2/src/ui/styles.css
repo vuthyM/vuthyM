@@ -1728,3 +1728,26 @@ input.sw:focus-visible,.seg-in:focus-visible+span{outline:2px solid var(--accent
 .tb-offline::before{content:'';width:8px;height:8px;border-radius:50%;background:var(--warn,#c98a1a)}
 .tb-offline-note{font-weight:400;color:var(--fg-soft)}
 @media (max-width:900px){.tb-offline-note{display:none}}
+
+/* ---------- combat, round two: the creature whose turn it is gets everything, the rest stay to a line ---------- */
+.c-row{grid-template-columns:44px minmax(0,1fr) 34px;align-items:start;padding:9px 12px;margin-bottom:6px}
+.c-row .c-initcol{padding-top:2px}
+.c-row.turn{background:color-mix(in srgb,var(--accent) 9%,var(--surface));padding-top:12px;padding-bottom:12px}
+.c-row.turn .c-name>span:first-child{font-size:1.12em}
+.c-row.turn .c-init{background:var(--accent);color:var(--accent-fg)}
+.c-main{min-width:0}
+.c-name .c-note-line{max-width:22ch;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:400}
+.c-hp{margin-top:4px}
+.c-more{margin-top:8px;padding-top:8px;border-top:1px solid color-mix(in srgb,var(--border) 70%,transparent)}
+.c-more .c-extra{margin-top:0}
+.c-more-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:8px}
+.c-more-row .c-conds{flex:1 1 100%;order:3}
+.c-more-row .c-conds summary{cursor:pointer}
+.c-remove{margin-left:auto}
+.c-toggle{width:34px;height:34px;border:1px solid transparent;background:transparent;border-radius:8px;color:var(--fg-soft);display:grid;place-items:center;cursor:pointer}
+.c-toggle:hover:not(:disabled){border-color:var(--border);background:var(--surface-2)}
+.c-toggle:disabled{opacity:.35;cursor:default}
+.c-toggle svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;transition:transform .15s}
+.c-toggle[aria-expanded=true] svg{transform:rotate(180deg)}
+.c-listbar{display:flex;justify-content:flex-end;margin:0 0 4px}
+.c-name .mini.roll{width:26px;height:22px;display:inline-grid;place-items:center;border-radius:6px;padding:0}

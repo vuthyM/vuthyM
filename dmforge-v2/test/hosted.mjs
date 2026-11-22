@@ -3,6 +3,7 @@ const { chromium } = __pwRequire(import.meta.url)('playwright');
 import { spawn, spawnSync } from 'node:child_process';
 import fs from 'node:fs'; import os from 'node:os'; import path from 'node:path'; import url from 'node:url';
 import { demoFiles } from '../src/core/demo.js';
+const sleep = ms => new Promise(r => setTimeout(r, ms));
 
 /* V3: the whole app running against the hosted server (SQLite), signed in the way a browser would. */
 const here = path.dirname(url.fileURLToPath(import.meta.url));
@@ -90,6 +91,19 @@ await pg.click('#deleteBtn'); await pg.click('.modal button:has-text("Delete not
 await pg.click('#pushBtn'); await pg.waitForSelector('.rev-row'); await pg.click('#confirmPush'); await pg.waitForSelector('text=Pushed to your vault'); await pg.click('text=Done');
 check('deleted note is gone from the vault but kept in the trash', (await api('read', 'Ashfall/Plot Threads/Who Poisoned the Well.md')).status === 404
   && (await (await api('trash-list', '')).json()).some(t => t.path === '.trash/Ashfall/Plot Threads/Who Poisoned the Well.md'));
+// earlier versions of a note
+await pg.click('.nav-btn:has-text("NPCs")'); await pg.click('.list-item:has-text("Old Tam")');
+await pg.click('#noteMore'); await pg.click('#historyBtn'); await pg.waitForSelector('#historyList');
+check('Earlier versions lists what the server kept (import, push, undo)', (await pg.locator('#historyList .trash-row').count()) === 3);
+await pg.click('#historyList .trash-row:last-child [data-look]');
+await pg.waitForSelector('#historyText');
+check('a version can be read', (await pg.textContent('#historyText')).includes('Old Tam') || (await pg.textContent('#historyText')).length > 10);
+check('the current text cannot be "restored" over itself', await pg.isDisabled('#historyUse'));
+await pg.click('#historyList .trash-row:nth-child(2) [data-look]');
+await pg.waitForFunction(() => document.querySelector('#historyText').textContent.includes('race: Human'));
+await pg.click('#historyUse'); await sleep(300);
+check('using an earlier version stages it as an unpushed change', (await pg.evaluate(() => window.__dmforge.S.working.count)) >= 1 && (await pg.evaluate(() => window.__dmforge.S.working.get('Ashfall/NPCs/Old Tam.md'))).includes('race: Human'));
+check('and the server is untouched until a push', !(await (await api('read', 'Ashfall/NPCs/Old Tam.md')).text()).includes('race: Human'));
 check('no page errors against the hosted server', errs.length === 0, errs.join('\n'));
 await pg.context().close();
 

@@ -204,12 +204,12 @@ function useItems() {
       <button class="btn btn-sm" id="setTrashBtn" onClick={() => set({ dialog: { kind: 'trash' } })}>Open the trash…</button>
     </Row>));
   add('data', 'update', 'Check for an update', 'update upgrade zip downloads restart', (
-    <Row key="update" id="update" title="Check for an update" desc={S.helper ? 'Installs a newer DM-Forge-V2.zip from your Downloads folder and restarts, without typing anything in the Terminal.' : 'Needs the helper (start DM Forge with Start DM Forge.command).'}>
-      <button class="btn btn-sm" id="setUpdate" disabled={!S.helper} onClick={() => checkForUpdate({ manual: true })}>Check now</button>
+    <Row key="update" id="update" title="Check for an update" desc={S.hosted ? 'The server is updated by replacing its Docker image. This page offers a Reload when a newer version is running.' : S.helper ? 'Installs a newer DM-Forge-V2.zip from your Downloads folder and restarts, without typing anything in the Terminal.' : 'Needs the helper (start DM Forge with Start DM Forge.command).'}>
+      <button class="btn btn-sm" id="setUpdate" disabled={!S.helper || S.hosted} onClick={() => checkForUpdate({ manual: true })}>Check now</button>
     </Row>));
   add('data', 'version', 'Version', 'version roll back forward previous', (
-    <Row key="version" id="version" title={'Version ' + __DMF_VERSION__} desc={S.helper ? 'Roll back to the version before, or forward again. DM Forge restarts for you.' : 'You are on ' + __DMF_VERSION__ + '. Rolling back needs the helper.'}>
-      <button class="btn btn-sm" id="setVersion" disabled={!S.helper} onClick={() => set({ dialog: { kind: 'version' } })}>Versions…</button>
+    <Row key="version" id="version" title={'Version ' + __DMF_VERSION__} desc={S.hosted ? 'You are on ' + __DMF_VERSION__ + '. Rolling back means running the earlier Docker image.' : S.helper ? 'Roll back to the version before, or forward again. DM Forge restarts for you.' : 'You are on ' + __DMF_VERSION__ + '. Rolling back needs the helper.'}>
+      <button class="btn btn-sm" id="setVersion" disabled={!S.helper || S.hosted} onClick={() => set({ dialog: { kind: 'version' } })}>Versions…</button>
       <button class="btn btn-sm btn-ghost" id="setHistory" onClick={() => set({ section: 'history', selected: null, editing: false })}>What changed</button>
     </Row>));
   return items;

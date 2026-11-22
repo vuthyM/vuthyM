@@ -1,4 +1,5 @@
 import { dirname, basename } from './util.js';
+import { OfflineCache } from './offlinecache.js';
 
 /* A vault is anything that can list, read and write files by vault-relative
    path ("NPCs/Mira.md"). The root is "". Two implementations: FsaVault wraps a
@@ -214,4 +215,147 @@ export class HttpVault {
   async trashList() { return (await this._call('trash-list', '')).json(); }
   async trashRestore(path) { return (await (await this._call('trash-restore', path, { method: 'POST' })).json()).path; }
   async ensureWrite() { return true; }
+}
+
+/* The V3 server (server/dmforge_hosted.py). It speaks the same requests as the Mac helper, and adds:
+   - every write and trash says which version of the note it was based on, so the server refuses (409) to overwrite
+     a note that changed elsewhere in the meantime, whatever the timing
+   - everything read is kept in this browser, so the campaign opens and can be worked on with no connection
+   - note history, a change feed (what moved on the server since I last looked) and search */
+export class ServerVault extends HttpVault {
+  constructor({ name, token = '', base = '' }) {
+    super({ name, token, base });
+    this.hosted = true;
+    this.versions = new Map();               // the server's version number for each note I have read or written
+    this.cache = new OfflineCache(name);
+    this.online = true;
+    this.onStatus = null;                    // called with true/false when reaching the server starts or stops working
+    this.device = deviceId();
+  }
+  _setOnline(on) { if (on !== this.online) { this.online = on; if (this.onStatus) { try { this.onStatus(on); } catch (e) { /* a listener must not break a request */ } } } }
+  async _call(op, path, init = {}, more = '') {
+    const extra = this.pushId && (op === 'write' || op === 'trash') ? '&push=' + encodeURIComponent(this.pushId) : '';
+    const url = this.base + '/api/' + op + '?path=' + encodeURIComponent(path || '') + extra + '&device=' + encodeURIComponent(this.device) + more;
+    let res;
+    try { res = await fetch(url, Object.assign({}, init, { credentials: 'same-origin', headers: Object.assign({ 'X-DMF-Token': this.token }, init.headers || {}) })); }
+    catch (e) {
+      this._setOnline(false);
+      const err = new Error('Cannot reach the DM Forge server. You can keep working: your changes are saved on this device and can be pushed once it is reachable again.');
+      err.offline = true;
+      throw err;
+    }
+    this._setOnline(true);
+    if (!res.ok) {
+      let body = null;
+      try { body = await res.json(); } catch (e) { /* not JSON */ }
+      const err = new Error((body && body.error) || 'The server returned an error (' + res.status + ')');
+      err.status = res.status;
+      if (res.status === 401) { err.auth = true; err.message = 'Your sign-in has expired. Reload this page to sign in again; your changes are kept.'; }
+      if (res.status === 409 && body) { err.conflict = body.conflict; err.current = body.current; }
+      throw err;
+    }
+    return res;
+  }
+  _notCached() { const e = new Error('That has not been saved on this device yet, so it cannot be opened without a connection.'); e.offline = true; return e; }
+  async readText(path) {
+    try {
+      const res = await this._call('read', path);
+      const text = await res.text();
+      const version = +res.headers.get('X-DMF-Version') || 0;
+      this.versions.set(path, version);
+      this.cache.put('text', path, { version, text });
+      return text;
+    } catch (e) {
+      if (e.offline) { const c = await this.cache.get('text', path); if (c) { this.versions.set(path, c.version); return c.text; } throw this._notCached(); }
+      if (e.status === 404) { this.cache.del('text', path); this.versions.delete(path); }
+      throw e;
+    }
+  }
+  async readBlob(path) {
+    try {
+      const blob = await (await this._call('read', path)).blob();
+      this.cache.put('blob', path, { blob });
+      return blob;
+    } catch (e) {
+      if (e.offline) { const c = await this.cache.get('blob', path); if (c) return c.blob; throw this._notCached(); }
+      throw e;
+    }
+  }
+  async list(path) {
+    try {
+      const out = await (await this._call('list', path)).json();
+      this.cache.put('list', path, { list: out });
+      return out;
+    } catch (e) {
+      if (e.offline) { const c = await this.cache.get('list', path); if (c) return c.list; throw this._notCached(); }
+      throw e;
+    }
+  }
+  async exists(path) {
+    try { return (await (await this._call('exists', path)).json()).exists; }
+    catch (e) {
+      if (!e.offline) throw e;
+      if (await this.cache.get('text', path) || await this.cache.get('blob', path)) return true;
+      const parent = await this.cache.get('list', dirname(path));
+      return !!(parent && parent.list.some(x => x.name === basename(path)));
+    }
+  }
+  async stat(path) {
+    try { return await (await this._call('stat', path)).json(); }
+    catch (e) {
+      if (!e.offline) throw e;
+      const c = await this.cache.get('text', path);
+      if (c) return { size: c.text.length, mtime: 0 };
+      throw this._notCached();
+    }
+  }
+  /* keep the saved folder listings in step with what is added and removed, so a note made on another device (or here) is there when the
+     campaign is opened offline */
+  async noteSeen(path) {
+    let child = basename(path), kind = 'file', dir = dirname(path);
+    for (;;) {
+      const c = await this.cache.get('list', dir);
+      const list = c ? c.list : [];
+      if (c && list.some(x => x.name === child)) { if (kind === 'file') break; }
+      else await this.cache.put('list', dir, { list: [...list, { name: child, kind }] });
+      if (!dir) break;
+      child = basename(dir); kind = 'dir'; dir = dirname(dir);
+    }
+  }
+  async noteGone(path) {
+    const dir = dirname(path), c = await this.cache.get('list', dir);
+    if (c) await this.cache.put('list', dir, { list: c.list.filter(x => x.name !== basename(path)) });
+    await this.cache.del('text', path);
+    this.versions.delete(path);
+  }
+  async writeText(path, text) {
+    const base = this.versions.has(path) ? this.versions.get(path) : 0;
+    const res = await this._call('write', path, { method: 'POST', body: new Blob([text], { type: 'text/plain;charset=utf-8' }) }, '&base=' + base);
+    const j = await res.json();
+    this.versions.set(path, j.version);
+    await this.cache.put('text', path, { version: j.version, text });
+    await this.noteSeen(path);
+  }
+  async moveToTrash(path) {
+    await this._call('trash', path, { method: 'POST' }, this.versions.has(path) ? '&base=' + this.versions.get(path) : '');
+    await this.noteGone(path);
+  }
+  async trashRestore(path) { this.versions.delete(trashOriginal(path)); return super.trashRestore(path); }
+  /* the server's feed of changes after `since`, and the number to ask from next time. A huge `since` just returns the current number. */
+  async changes(since) { return (await this._call('changes', '', {}, '&since=' + encodeURIComponent(since))).json(); }
+  async seqNow() { return (await this.changes(Number.MAX_SAFE_INTEGER)).seq; }
+  async history(path) { return (await this._call('history', path)).json(); }
+  async versionText(path, version) { return (await this._call('version', path, {}, '&v=' + encodeURIComponent(version))).text(); }
+  async search(q) { return (await this._call('search', '', {}, '&q=' + encodeURIComponent(q))).json(); }
+  async ping() { return (await this._call('ping', '')).json(); }
+  /* the server is updated by replacing its Docker image, not from inside the app */
+  async updateInfo() { return { current: '', available: null, downloads: '' }; }
+}
+
+function deviceId() {
+  try {
+    let id = localStorage.getItem('dmforge:device');
+    if (!id) { id = Math.random().toString(36).slice(2, 8); localStorage.setItem('dmforge:device', id); }
+    return id;
+  } catch (e) { return 'unknown'; }
 }

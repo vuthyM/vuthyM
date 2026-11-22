@@ -1,0 +1,31 @@
+# DM Forge V3. Start:  docker compose up -d --build
+# Read deploy/DEPLOY-V3.md first. Nothing here listens on your network: the port is published on this machine's
+# loopback only (127.0.0.1), and Tailscale carries it to your devices (tailscale serve, step 3 of the guide).
+services:
+  dmforge:
+    build: .
+    image: dmforge:v3
+    container_name: dmforge
+    restart: unless-stopped
+    user: "${DMFORGE_UID:-1000}:${DMFORGE_GID:-1000}"
+    ports:
+      # Never "0.0.0.0" or a bare "8765:8765": that would put the app on every network this machine is on.
+      - "127.0.0.1:${DMFORGE_PORT:-8765}:8765"
+    environment:
+      DMFORGE_TOKEN: "${DMFORGE_TOKEN:?Set DMFORGE_TOKEN in the .env file (see .env.example)}"
+      DMFORGE_NAME: "${DMFORGE_NAME:-DM Forge}"
+      DMFORGE_HOSTS: "${DMFORGE_HOSTS:-}"
+      DMFORGE_EXPORT_DIR: /export
+      DMFORGE_BACKUP_HOUR: "${DMFORGE_BACKUP_HOUR:-3}"
+      DMFORGE_BACKUP_KEEP: "${DMFORGE_BACKUP_KEEP:-14}"
+      TZ: "${TZ:-Australia/Sydney}"
+    volumes:
+      - ./data:/data          # the database, its nightly copies (data/backups) and nothing else
+      - ./export:/export      # the nightly Markdown copy of the whole campaign
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL

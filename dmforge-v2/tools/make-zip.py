@@ -30,6 +30,14 @@ with zipfile.ZipFile(OUT, 'w') as z:
     for f in sorted(os.listdir(os.path.join(ROOT, 'test'))):
         if f.endswith(('.mjs', '.js', '.py')) and 'debug' not in f and 'smoke' not in f:
             add(z, os.path.join(ROOT, 'test', f), TOP + 'source/test/' + f)
+    # V3: the server, its tests and the Docker files (the helper and DM-Forge.html above are what V2 uses; these are extra)
+    for f in sorted(os.listdir(os.path.join(ROOT, 'server'))):
+        if f.endswith(('.py', '.js')):
+            add(z, os.path.join(ROOT, 'server', f), TOP + 'source/server/' + f)
+    for f in ('Dockerfile', 'docker-compose.yml', '.dockerignore', '.env.example', 'package-lock.json', 'V3-PLAN.md'):
+        if os.path.exists(os.path.join(ROOT, f)):
+            add(z, os.path.join(ROOT, f), TOP + 'source/' + f)
+    add(z, os.path.join(ROOT, 'deploy', 'DEPLOY-V3.md'), TOP + 'source/deploy/DEPLOY-V3.md')
     add(z, os.path.join(ROOT, 'tools', 'make-zip.py'), TOP + 'source/tools/make-zip.py')
     add(z, os.path.join(ROOT, 'tools', 'build-srd.py'), TOP + 'source/tools/build-srd.py')
     add(z, os.path.join(ROOT, 'tools', 'build-srd-spells.py'), TOP + 'source/tools/build-srd-spells.py')

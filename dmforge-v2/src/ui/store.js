@@ -37,6 +37,7 @@ export const S = {
   loadMsg: '', toasts: [], review: null, dialog: null,
   dataRev: 0, combat: null, combatTarget: null, combatHist: [], encounter: [],
   lastVault: null, mappingBack: 'browse', brave: false, helper: false, pickerBlocked: false,
+  hosted: false, online: true, remoteSeq: 0,      // V3 server: is the server in use, can it be reached right now, and the last change number seen from it
 };
 
 /* Several tabs can be open at once. `section`, `selected` and `editing` read and write

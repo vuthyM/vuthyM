@@ -346,6 +346,14 @@ listed in `src/core/fontsets.js`, their CSS is at the end of `src/ui/styles.css`
   highlights it, and a list of the recent changes (10, 20 or 50 kept). It is kept in this browser only and never written to
   your vault; *Clear tracked changes* empties it. If you undo or discard a change that was not pushed, its entry goes too (it only describes changes that are still in the note).
 
+## V3 preview: your own server
+
+Instead of running from your Mac, DM Forge can run on a small server of yours (Docker on a mini PC, reached over Tailscale). The
+campaign is kept in a database with every earlier version of every note, the server makes a nightly copy of the database and a
+nightly plain-Markdown copy of the whole campaign, and the app keeps working with no connection (edits wait as unpushed changes, and
+the server will not overwrite a note that changed since you started). Everything about setting it up is in `deploy/DEPLOY-V3.md`;
+the plan and what is still to come are in `V3-PLAN.md`. The Mac helper and folder mode are unchanged.
+
 ## Your own monsters
 
 The **Monsters** button in the sidebar (under Reference; Ctrl+K "Monster library"; also Combat, Add, Monsters) opens the Monster library. **+ New monster** opens a

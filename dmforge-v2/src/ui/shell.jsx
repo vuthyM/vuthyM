@@ -260,6 +260,7 @@ export function Shell() {
           <NavButtons />
           <SearchBox />
           <div class="spacer" />
+          {s.hosted && !s.online && <span class="tb-offline" id="offlineChip" role="status" title="The server cannot be reached. You can keep working: everything is saved on this device, and pushing waits until it is back (this page checks for you).">Offline<span class="tb-offline-note"> · saved on this device</span></span>}
           <JobPill />
           <Island />
           <ViewMenu />

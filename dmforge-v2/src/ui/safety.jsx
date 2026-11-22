@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'preact/hooks';
-import { S, set, toast } from './store.js';
+import { S, set, toast, touch } from './store.js';
 import { Modal } from './common.jsx';
 import { listTrash, restoreFromTrash, reloadCampaign, askSwitchVersion, openTab, setSection } from './actions.js';
 import { basename, dirname } from '../core/util.js';
@@ -77,6 +77,55 @@ export function VersionDialog() {
       )}
       <p class="muted small">Switching restarts the helper in its Terminal window for you and reloads this page. Unpushed changes are kept.</p>
       <div class="modal-actions"><button class="btn" onClick={close}>Close</button></div>
+    </Modal>
+  );
+}
+
+/* More menu, Earlier versions (the V3 server keeps every version of every note): look at one, and stage it as your current text.
+   Nothing is written until you push, so it can still be changed or thrown away. */
+const WHAT = { write: 'Saved', trash: 'Deleted', restore: 'Restored from the trash', import: 'Imported', undo: 'Put back by an undo' };
+const when = ms => new Date(ms).toLocaleString(undefined, { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' });
+export function NoteHistoryDialog({ path }) {
+  const [list, setList] = useState(null);
+  const [err, setErr] = useState('');
+  const [open, setOpen] = useState(null);         // { version, text }
+  useEffect(() => {
+    let live = true;
+    S.vault.history(path).then(l => live && setList(l)).catch(e => live && setErr(e && e.message ? e.message : String(e)));
+    return () => { live = false; };
+  }, [path]);
+  const look = async v => {
+    try { setOpen({ version: v.version, text: await S.vault.versionText(path, v.version) }); }
+    catch (e) { toast('Could not read that version: ' + (e && e.message ? e.message : e), true); }
+  };
+  const current = S.working.get(path);
+  const use = () => {
+    S.working.setText(path, open.text);
+    touch();
+    toast('Staged an earlier version of “' + basename(path).replace(/\.md$/i, '') + '”. Push changes to save it; until then you can still change it or discard it.');
+    close();
+  };
+  return (
+    <Modal title={'Earlier versions of ' + basename(path).replace(/\.md$/i, '')} onClose={close} wide focusFirst={false}>
+      <p class="muted small" style="margin-top:0">The server keeps every version of every note it has ever held, so nothing a push overwrites is lost. Pick one to read it; “Use this version” stages it as your current text.</p>
+      {err && <p class="small" style="color:var(--danger)">Could not read the history: {err}</p>}
+      {!list && !err && <p class="muted">Looking…</p>}
+      {list && list.length === 0 && <p class="muted">This note has no saved history yet.</p>}
+      {list && list.length > 0 && (
+        <ul class="trash-list" id="historyList">
+          {list.map(v => (
+            <li key={v.seq} class="trash-row" data-version={v.version}>
+              <div><b>{when(v.mtime)}</b><div class="small muted">{WHAT[v.action] || v.action}{v.device ? ' · from ' + v.device : ''} · {v.size || 0} characters</div></div>
+              <button class="btn btn-sm" data-look={v.version} onClick={() => look(v)}>{open && open.version === v.version ? 'Showing' : 'Look'}</button>
+            </li>
+          ))}
+        </ul>
+      )}
+      {open && <pre class="hist-pre" id="historyText" style="max-height:260px;overflow:auto;white-space:pre-wrap;background:var(--surface-2);border:1px solid var(--border);border-radius:8px;padding:10px;font-size:13px">{open.text}</pre>}
+      <div class="modal-actions">
+        <button class="btn" onClick={close}>Close</button>
+        <button class="btn btn-primary" id="historyUse" disabled={!open || open.text === current} onClick={use}>{open && open.text === current ? 'That is the current text' : 'Use this version'}</button>
+      </div>
     </Modal>
   );
 }

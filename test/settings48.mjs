@@ -26,7 +26,7 @@ check('seven categories down the left', await pg.locator('.set-cat').count() ===
 check('it starts on Appearance', (await pg.getAttribute('[data-setcat="appearance"]', 'aria-current')) === 'page');
 
 /* ---- one category at a time */
-const cats = { appearance: ['theme', 'darkstyle', 'accent', 'fontset'], layout: ['layout', 'sidebar'], writing: ['leave', 'autoopen'], sessions: ['track', 'neglect'], library: ['srd', 'groupafter', 'gens'], claude: ['claude', 'snapshot'], data: ['undopush', 'moveset', 'trash', 'update', 'version'] };
+const cats = { appearance: ['theme', 'palette', 'accent', 'fontset'], layout: ['layout', 'sidebar'], writing: ['leave', 'autoopen'], sessions: ['track', 'neglect'], library: ['srd', 'groupafter', 'gens'], claude: ['claude', 'snapshot'], data: ['undopush', 'moveset', 'trash', 'update', 'version'] };
 for (const [c, ids] of Object.entries(cats)) {
   await pg.click('[data-setcat="' + c + '"]');
   const got = await shown();
@@ -73,7 +73,7 @@ await pg.fill('#settingsSearch', 'zzzzqqq');
 check('nothing matching says so', (await shown()).length === 0 && (await pg.textContent('#setResults')).includes('Nothing matches'));
 await pg.fill('#settingsSearch', 'dark');
 const darkHits = await shown();
-check('"dark" finds the colour options', darkHits.includes('theme') && darkHits.includes('darkstyle'), JSON.stringify(darkHits));
+check('"dark" finds the colour options (the dark-style row belongs to Classic only)', darkHits.includes('theme') && darkHits.includes('palette') && !darkHits.includes('darkstyle'), JSON.stringify(darkHits));
 await pg.keyboard.press('Escape');
 check('Escape clears the search and returns to the category', (await pg.inputValue('#settingsSearch')) === '' && await pg.locator('.set-cat.on').count() === 1);
 await pg.fill('#settingsSearch', 'srd'); 

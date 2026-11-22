@@ -1764,3 +1764,26 @@ input.sw:focus-visible,.seg-in:focus-visible+span{outline:2px solid var(--accent
 .tidyups .tidy-text{flex:1;min-width:220px}
 .tidyups .tidy-text .small{margin-top:1px}
 .drop-hint{padding:6px 10px;margin:2px 6px 4px;font-size:12.5px;text-align:left}
+
+/* ---------- colour themes (palettes.css has the colours; this is how they are used) ---------- */
+/* restrained: a solid accent means "do this" (the main button, the one thing to push); everything that merely marks where you are is a soft tint */
+:root{--accent-ink:color-mix(in srgb,var(--accent) 70%,var(--fg))}     /* the accent, nudged toward the text colour, for text on a tint of the accent (always 4.5:1 or better, checked in the tests) */
+.nav-btn[aria-current="page"]{background:color-mix(in srgb,var(--accent) 12%,transparent);color:var(--accent-ink);font-weight:600}
+:root:not([data-palette]) .nav-btn[aria-current="page"]{background:var(--accent);color:var(--accent-fg)}
+.nav-btn[aria-current="page"] .badge{color:var(--accent-ink);opacity:1}
+.nav-btn[aria-current="page"] .nav-star,.nav-btn[aria-current="page"] .nav-star.is{color:var(--accent-ink)}
+.nav-btn[aria-current="page"] .nav-star:hover{background:color-mix(in srgb,var(--accent) 18%,transparent)}
+:root:not([data-palette]) .nav-btn[aria-current="page"] .badge,:root:not([data-palette]) .nav-btn[aria-current="page"] .nav-star,:root:not([data-palette]) .nav-btn[aria-current="page"] .nav-star.is{color:var(--accent-fg)}
+:root[data-palette] .backdrop{background:rgba(6,9,16,.55)}
+:root[data-palette] .tour-dim{background:rgba(6,9,16,.58)}
+:root[data-palette] .tour-spot{box-shadow:0 0 0 9999px rgba(6,9,16,.58),0 0 0 3px var(--accent)}
+.palette-row{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:10px;width:100%}
+.palette-card{display:flex;flex-direction:column;gap:6px;align-items:flex-start;text-align:left;padding:10px;border:1px solid var(--border);border-radius:12px;background:var(--surface);cursor:pointer}
+.palette-card:hover{border-color:var(--fg-muted)}
+.palette-card[aria-checked="true"]{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent) inset}
+.palette-chip{display:flex;width:100%;height:46px;border-radius:8px;overflow:hidden;border:1px solid var(--border)}
+.pc-half{position:relative;flex:1;display:block}
+.pc-half i{position:absolute;left:8px;top:8px;right:8px;height:14px;border-radius:4px;display:block}
+.pc-half b{position:absolute;left:8px;bottom:7px;width:30px;height:9px;border-radius:5px;display:block}
+.palette-name{font-weight:600}
+.palette-blurb{font-size:12.5px;color:var(--fg-soft);line-height:1.35}

@@ -7,6 +7,7 @@ const results = [];
 const check = (name, cond, extra) => { results.push(!!cond); console.log((cond ? 'PASS ' : 'FAIL ') + name + (cond ? '' : '  ' + (extra ?? ''))); };
 const b = await chromium.launch({ args: ['--no-sandbox'] });
 const pg = await (await b.newContext({ viewport: { width: 1440, height: 900 } })).newPage();
+await pg.addInitScript(() => { try { if (!localStorage.getItem('dmforge:settings')) localStorage.setItem('dmforge:settings', '{"palette":"classic"}'); } catch (e) { /* storage unavailable */ } });   // these check the Classic colours: the new themes have their own test (palette57)
 const errors = []; pg.on('pageerror', e => errors.push(e.message));
 await pg.goto('file://' + path.join(here, '..', 'dist', 'DM-Forge.html'));
 await pg.click('text=Try the demo vault');

@@ -8,6 +8,7 @@ import { GROUPS } from '../core/genlayout.js';
 import { GENS_BY_ID } from '../core/generators.js';
 import { parseDelay, delayText, MAX_DELAY } from '../core/shortcuts.js';
 import { ACCENTS } from '../core/accent.js';
+import { PALETTES, paletteId } from '../core/palettes.js';
 import { NEGLECT_CHOICES } from '../core/forgetting.js';
 import { FONT_SETS } from '../core/fontsets.js';
 import { SnapshotSection } from './snapshot.jsx';
@@ -122,18 +123,37 @@ function useItems() {
     <Row key="theme" id="theme" title="Colours" desc="Auto follows your Mac, light or dark.">
       <Seg name="theme" label="Colours" value={S.theme} onChange={setTheme} options={[{ v: 'auto', label: 'Auto', id: 'setThemeAuto' }, { v: 'light', label: 'Light', id: 'setThemeLight' }, { v: 'dark', label: 'Dark', id: 'setThemeDark' }]} />
     </Row>));
-  add('appearance', 'darkstyle', 'Dark mode style', 'warm blue grey slate night', (
+  add('appearance', 'palette', 'Colour theme', 'palette colour color theme dark light night day tide fig olive classic navy plum rust rose brown gold', (
+    <Row key="palette" id="palette" title="Colour theme" desc="The colours of the whole app, in a dark and a light version that follow the setting above." stack>
+      <div id="paletteGroup" class="palette-row" role="radiogroup" aria-label="Colour theme">
+        {[...PALETTES.map(p => ({ id: p.id, label: p.label, blurb: p.blurb, d: p.dark, l: p.light })), { id: 'classic', label: 'Classic', blurb: 'The original warm brown and gold', d: { bg: '#181714', surface: '#211f1b', accent: '#d9a441' }, l: { bg: '#efece2', surface: '#ffffff', accent: '#8a6218' } }].map(p => (
+          <button key={p.id} id={'setPalette-' + p.id} class="palette-card" role="radio" aria-checked={paletteId(st.palette) === p.id} data-palette-pick={p.id} onClick={() => updateSetting('palette', p.id)}>
+            <span class="palette-chip" aria-hidden="true">
+              <span class="pc-half" style={'background:' + p.d.bg}><i style={'background:' + p.d.surface} /><b style={'background:' + p.d.accent} /></span>
+              <span class="pc-half" style={'background:' + p.l.bg}><i style={'background:' + p.l.surface} /><b style={'background:' + p.l.accent} /></span>
+            </span>
+            <span class="palette-name">{p.label}</span>
+            <span class="palette-blurb">{p.blurb}</span>
+          </button>
+        ))}
+      </div>
+    </Row>));
+  if (paletteId(st.palette) === 'classic') add('appearance', 'darkstyle', 'Dark mode style', 'warm blue grey slate night', (
     <Row key="darkstyle" id="darkstyle" title="Dark mode style" desc="Warm is brown-black. Blue-grey is cooler, the dark mode DM Forge had before.">
       <Seg name="darkStyle" label="Dark mode style" value={st.darkStyle === 'slate' ? 'slate' : 'warm'} onChange={v => updateSetting('darkStyle', v)} options={[{ v: 'warm', label: 'Warm', id: 'setDarkWarm' }, { v: 'slate', label: 'Blue-grey', id: 'setDarkSlate' }]} />
     </Row>));
   if (S.campaign) add('appearance', 'accent', 'Colour of this campaign', 'accent colour color buttons links gold ember', (
     <Row key="accent" id="accent" title="Colour of this campaign" desc="Buttons, links and the active page take this colour. Each campaign remembers its own." stack>
       <div id="accentGroup" class="accent-row" role="radiogroup" aria-label="Campaign accent colour">
-        {ACCENTS.map(a => (
+        {ACCENTS.map(a0 => {
+          const own = a0.key === 'gold' && paletteId(st.palette) !== 'classic' ? PALETTES.find(p => p.id === paletteId(st.palette)) : null;
+          const a = own ? { key: 'gold', label: own.label + ' (theme)', light: own.light.accent, dark: own.dark.accent } : a0;
+          return (
           <button key={a.key} class="swatch" role="radio" aria-checked={S.accent === a.key} data-accent-pick={a.key} onClick={() => setAccent(a.key)}>
             <span class="chip-dot" style={'--sw-l:' + a.light + ';--sw-d:' + a.dark} />{a.label}
           </button>
-        ))}
+          );
+        })}
       </div>
     </Row>));
   add('appearance', 'fontset', 'Typeface', 'font fonts type letters serif sans text titles heading', (

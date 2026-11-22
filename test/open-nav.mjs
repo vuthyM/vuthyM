@@ -11,7 +11,7 @@ for (const cr of [other]) if (cr) { const launch = cr.launch.bind(cr);
   const nc = b.newContext.bind(b);
   b.newContext = async (...x) => {
     const c = await nc(...x);
-    await c.addInitScript(() => { try { localStorage.setItem('dmforge:sp-cast', '1'); localStorage.setItem('dmforge:combat-rows', 'all'); } catch (e) { /* storage unavailable */ } });
+    await c.addInitScript(() => { try { localStorage.setItem('dmforge:sp-cast', '1'); localStorage.setItem('dmforge:combat-rows', 'all'); if (!localStorage.getItem('dmforge:settings')) localStorage.setItem('dmforge:settings', '{"palette":"classic"}'); } catch (e) { /* storage unavailable */ } });
     await c.addInitScript(css => { if (window.__keepNavOpen) return; window.__keepNavOpen = 1; const add = () => { const st = document.createElement('style'); st.textContent = css; document.documentElement.appendChild(st); }; document.documentElement ? add() : document.addEventListener('DOMContentLoaded', add); }, CSS);
     const np = c.newPage.bind(c);
     c.newPage = async (...y) => {

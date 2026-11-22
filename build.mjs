@@ -7,6 +7,8 @@ const here = path.dirname(url.fileURLToPath(import.meta.url));
 const out = path.join(here, 'dist');
 fs.mkdirSync(out, { recursive: true });
 
+import { paletteCss } from './src/core/palettes.js';
+fs.writeFileSync(path.join(here, 'src/ui/palettes.css'), paletteCss());
 const version = fs.readFileSync(path.join(here, 'VERSION'), 'utf8').trim();
 const result = await build({
   entryPoints: [path.join(here, 'src/ui/main.jsx')],
@@ -31,7 +33,7 @@ for (const f of result.outputFiles) {
 }
 const safeJs = js.replace(/<\/script/gi, '<\\/script');
 /* the logo (a gold "D" tile, as in the top bar) as the tab icon, inlined so the single file stays single */
-const favicon = 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" rx="14" fill="#d4a13f"/><text x="32" y="46" text-anchor="middle" font-family="Georgia,\'Times New Roman\',serif" font-weight="700" font-size="42" fill="#1c1404">D</text></svg>');
+const favicon = 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" rx="14" fill="#e8946a"/><text x="32" y="46" text-anchor="middle" font-family="Georgia,\'Times New Roman\',serif" font-weight="700" font-size="42" fill="#1d1008">D</text></svg>');
 const html = `<!doctype html>
 <html lang="en">
 <head>

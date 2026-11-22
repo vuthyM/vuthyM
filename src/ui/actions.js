@@ -36,6 +36,7 @@ import { buildStarter } from '../core/starter.js';
 import { lastSessionData, putLastTime, previousSession, nextSession, FROM_LABEL } from '../core/lastsession.js';
 import { TOUR, TOUR_KEY } from '../core/tour.js';
 import { FONT_SET_IDS } from '../core/fontsets.js';
+import { PALETTE_IDS, paletteId } from '../core/palettes.js';
 import { spotlightStats, removeSpotlightMoment, spotlightLines, namesPlayer } from '../core/spotlight.js';
 import { mapNoteFor, mapNoteText, writePins } from '../core/maps.js';
 import { readMtimes } from '../core/listview.js';
@@ -971,16 +972,22 @@ function cleanSettings(o) {
   if (o && typeof o.srdOn === 'boolean') out.srdOn = o.srdOn;
   if (o && (o.darkStyle === 'warm' || o.darkStyle === 'slate')) out.darkStyle = o.darkStyle;
   if (o && FONT_SET_IDS.includes(o.fontSet)) out.fontSet = o.fontSet;
+  if (o && PALETTE_IDS.includes(o.palette)) out.palette = o.palette;
   if (o && Array.isArray(o.recentGens)) out.recentGens = [...new Set(o.recentGens.filter(x => typeof x === 'string' && x.length < 40))].slice(0, 6);
   return out;
 }
 /* which typeface set the page uses (the fonts and their CSS variables are in fonts.css and styles.css); Today needs no attribute */
 function paintFontSet() { try { const id = S.settings.fontSet; if (!id || id === 'today') document.documentElement.removeAttribute('data-type'); else document.documentElement.setAttribute('data-type', id); } catch (e) { /* no document */ } }
-/* which dark style the page uses (the colours themselves are in styles.css) */
+/* which colour theme the page uses (the colours are in palettes.css, generated from core/palettes.js; Classic is styles.css on its own and needs no attribute) */
+function paintPalette() {
+  try { const id = paletteId(S.settings.palette); if (id === 'classic') document.documentElement.removeAttribute('data-palette'); else document.documentElement.setAttribute('data-palette', id); } catch (e) { /* no document */ }
+  if (window.__dmfGraph && window.__dmfGraph.requestDraw) setTimeout(() => window.__dmfGraph.requestDraw(), 60);
+}
+/* which dark style the page uses (the colours themselves are in styles.css; only Classic has dark styles) */
 function paintDarkStyle() { try { document.documentElement.setAttribute('data-dark', S.settings.darkStyle === 'slate' ? 'slate' : 'warm'); } catch (e) { /* no document */ } if (window.__dmfGraph && window.__dmfGraph.requestDraw) window.__dmfGraph.requestDraw(); }
 export function initSettings() {
   try { S.settings = Object.assign({}, S.settings, cleanSettings(JSON.parse(localStorage.getItem(SETTINGS_KEY) || '{}'))); } catch (e) { /* defaults */ }
-  paintDarkStyle(); paintFontSet();
+  paintDarkStyle(); paintFontSet(); paintPalette();
   setPoolSource(key => { const p = poolsMap()[key]; return p ? p.rows : null; });
   setNavGuard(leaveGuard);
 }
@@ -994,7 +1001,7 @@ export function openSettings(cat, focus, e) {
 }
 export function updateSetting(key, value) {
   S.settings = Object.assign({}, S.settings, cleanSettings({ [key]: value }));
-  paintDarkStyle(); paintFontSet();
+  paintDarkStyle(); paintFontSet(); paintPalette();
   try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(S.settings)); } catch (e) { /* storage unavailable */ }
   emit();
 }

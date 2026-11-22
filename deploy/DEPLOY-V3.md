@@ -83,6 +83,28 @@ Hidden folders (`.obsidian`, `.trash`) are skipped. A note that is already in th
 
 To get the campaign back out as Markdown files on demand: `docker compose run --rm dmforge python -I dmforge_io.py export /export`.
 
+## Importing dungeons from DMAtlas
+
+DM Forge can bring dungeons over from DMAtlas (the dungeon-map app): the picture of each level, a pin for every room, and one note with a section per room.
+DMAtlas keeps the geometry; DM Forge keeps what you write. Importing again moves pins and renames headings and never touches your text.
+
+1. In `.env` set `DMFORGE_DMATLAS_URL` to where DMAtlas publishes (for example `https://water.tail029b78.ts.net:8767`), then `docker compose up -d`.
+2. Check that **this server** can reach it (the container, not your Mac):
+
+```
+docker compose exec dmforge python -I dmforge_atlas.py
+```
+
+It prints `OK. N published dungeons:` and lists them, or says exactly why not.
+3. In the app: **Maps, Import from DMAtlas…** (or the command palette, or Settings, Data). Pick a dungeon, read the preview, import, then push.
+
+Pictures are fetched by the server, checked (a real PNG, no larger than 15 MB or 16384 pixels, and exactly the hash DMAtlas gave) and stored under
+`<campaign>/Maps/<dungeon>/`. They are in the nightly Markdown export and the database backups. Nothing else is fetched, and redirects are never followed.
+
+**If the check says it cannot reach DMAtlas:** a container does not always see the tailnet (names like `water.tail029b78.ts.net` may not resolve inside it).
+The ways round it, in order of tidiness: put DMAtlas and DM Forge on one Docker network and use DMAtlas's container address (`http://dmatlas:<its port>`),
+or publish DMAtlas on the Docker bridge address only (never `0.0.0.0`) and use that. Tell Claude what the check printed and it will say which fits.
+
 ## Backups
 
 Every night at `DMFORGE_BACKUP_HOUR` (default 3am) the server:

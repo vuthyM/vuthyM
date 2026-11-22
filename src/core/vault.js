@@ -347,6 +347,15 @@ export class ServerVault extends HttpVault {
   async history(path) { return (await this._call('history', path)).json(); }
   async versionText(path, version) { return (await this._call('version', path, {}, '&v=' + encodeURIComponent(version))).text(); }
   async search(q) { return (await this._call('search', '', {}, '&q=' + encodeURIComponent(q))).json(); }
+  /* DMAtlas (the dungeon-map app): the server fetches and checks everything, and stores the pictures; see server/dmforge_atlas.py */
+  async atlasStatus() { return (await this._call('atlas-status', '')).json(); }
+  async atlasDungeons() { return (await this._call('atlas-dungeons', '')).json(); }
+  async atlasDungeon(id) { return (await this._call('atlas-dungeon', '', {}, '&id=' + encodeURIComponent(id))).json(); }
+  async atlasImage({ mapId, sha256, dest }) {
+    const j = await (await this._call('atlas-image', '', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ mapId, sha256, dest }) })).json();
+    await this.noteSeen(j.path);
+    return j;
+  }
   async ping() { return (await this._call('ping', '')).json(); }
   /* the server is updated by replacing its Docker image, not from inside the app */
   async updateInfo() { return { current: '', available: null, downloads: '' }; }

@@ -39,6 +39,7 @@ import { FONT_SET_IDS } from '../core/fontsets.js';
 import { PALETTE_IDS, paletteId } from '../core/palettes.js';
 import { spotlightStats, removeSpotlightMoment, spotlightLines, namesPlayer } from '../core/spotlight.js';
 import { mapNoteFor, mapNoteText, writePins } from '../core/maps.js';
+import { sanitizeDungeon, sanitizeList, planImport as planAtlas, describePlan, mapNotePath } from '../core/atlas.js';
 import { readMtimes } from '../core/listview.js';
 import { locationTree, canMoveInto } from '../core/locations.js';
 import { addToCast, copyName, copyText, rollOne } from '../core/cast.js';
@@ -2319,6 +2320,58 @@ export function loadEncounterToBudget(found) {
   setSection('party');
 }
 
+
+/* ---------- importing dungeons from DMAtlas (core/atlas.js says what goes where; the server fetches and stores the pictures) ---------- */
+const needServer = () => { if (!S.hosted || !S.vault || !S.vault.atlasDungeon) throw new Error('Importing from DMAtlas needs the DM Forge server (V3). It is not available when DM Forge runs from a folder or the Mac helper.'); };
+/* the published dungeons, each marked if it was imported before */
+export async function atlasList() {
+  needServer();
+  const st = await S.vault.atlasStatus();
+  if (!st.configured) throw new Error('DMAtlas is not set up on this server. Add DMFORGE_DMATLAS_URL to its .env file (see deploy/DEPLOY-V3.md), then restart it.');
+  const list = sanitizeList(await S.vault.atlasDungeons());
+  const have = new Map();
+  for (const n of getIndex().notes) if (n.fm && n.fm.dmatlas && n.type !== 'map') have.set(String(n.fm.dmatlas), n.path);
+  return { base: st.base, list: list.map(d => ({ ...d, path: have.get(d.id) || '' })) };
+}
+/* what importing this dungeon would do, worked out but not done */
+export async function atlasPreview(id) {
+  needServer();
+  const checked = sanitizeDungeon(await S.vault.atlasDungeon(id));
+  if (checked.error) throw new Error(checked.error);
+  const dungeon = checked.dungeon;
+  const idx = getIndex();
+  const entry = idx.notes.find(n => n.fm && String(n.fm.dmatlas || '') === dungeon.id && n.type !== 'map');
+  const maps = new Map();
+  for (const m of idx.byType.map || []) if (m.fm && String(m.fm.dmatlas || '') === dungeon.id && m.fm['dmatlas-map']) maps.set(String(m.fm['dmatlas-map']), { path: m.path, text: S.working.get(m.path) });
+  const note = entry ? { path: entry.path, name: entry.name, text: S.working.get(entry.path) } : null;
+  const noteName = entry ? '' : basename(newNotePath(S.campaign, S.mapping, customId('Dungeons'), dungeon.name, S.working).path).replace(/\.md$/i, '');
+  const plan = planAtlas({ dungeon, campaignPath: S.campaign.path, note, noteName, maps });
+  return { dungeon, plan, warnings: checked.warnings, toFetch: plan.maps.filter(m => !S.files.includes(m.dest)).length, text: describePlan(plan) };
+}
+/* does it: the pictures first (if one cannot be stored, nothing at all is changed), then the notes as ordinary unpushed changes, so Push and Undo last push cover them */
+export async function atlasApply(pre) {
+  needServer();
+  const { plan, dungeon } = pre;
+  for (const m of plan.maps) await S.vault.atlasImage({ mapId: m.mapId, sha256: m.level.image.sha256, dest: m.dest });
+  let notePath = plan.note.path;
+  if (plan.note.isNew) {
+    const np = newNotePath(S.campaign, S.mapping, customId('Dungeons'), dungeon.name, S.working);
+    if (basename(np.path).replace(/\.md$/i, '') !== plan.note.name) throw new Error('A note called “' + plan.note.name + '” appeared in the meantime. Try the import again.');
+    S.working.create(np.path, plan.note.text);
+    if (np.isNewFolder) { S.mapping = Object.assign({}, S.mapping, { [np.folder]: customId('Dungeons') }); idbSet(mappingKey(), S.mapping); }
+    notePath = np.path;
+  } else if (plan.note.changed) S.working.setText(notePath, plan.note.text);
+  for (const m of plan.maps) {
+    if (m.isNew) {
+      let p = mapNotePath(S.campaign.path, dungeon, m.level);
+      for (let i = 2; S.working.has(p) && i < 50; i++) p = mapNotePath(S.campaign.path, dungeon, m.level).replace(/\.md$/, ' ' + i + '.md');
+      S.working.create(p, m.text);
+    } else if (m.changed) S.working.setText(m.path, m.text);
+  }
+  S.files = [...new Set([...S.files, ...plan.maps.map(m => m.dest)])].sort();
+  touch();
+  return { notePath };
+}
 
 /* ---------- a campaign's own accent colour (core/accent.js) ---------- */
 const accentStoreKey = () => 'dmforge:accent:' + S.vaultKey + '|' + (S.campaign ? S.campaign.path : '');

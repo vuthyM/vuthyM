@@ -10,7 +10,7 @@ RUN node build.mjs
 
 FROM python:3.12-slim
 WORKDIR /app
-COPY server/dmforge_db.py server/dmforge_hosted.py server/dmforge_io.py server/sw.js ./
+COPY server/dmforge_db.py server/dmforge_hosted.py server/dmforge_io.py server/dmforge_atlas.py server/sw.js ./
 COPY --from=build /src/dist/DM-Forge.html ./DM-Forge.html
 COPY VERSION ./VERSION
 ENV DMFORGE_DATA=/data \

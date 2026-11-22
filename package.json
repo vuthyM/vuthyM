@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "build": "node build.mjs",
-    "test": "node --test test/core.test.mjs"
+    "test": "node --test test/core.test.mjs test/atlas.test.mjs"
   },
   "dependencies": {
     "@fontsource/alegreya": "^5.3.0",

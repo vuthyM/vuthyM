@@ -30,6 +30,7 @@ function actions(idx, q) {
     { id: 'menu', label: 'Menu', words: 'menu', run: () => set({ dialog: { kind: 'menu' } }) },
     ...(currentSessionPath() ? [{ id: 'tidynotes', label: 'Tidy notes (current session)', words: 'tidy rewrite organise clean notes session', run: () => set({ dialog: { kind: 'tidy', path: currentSessionPath() } }) }] : []),
     ...(S.helper ? [{ id: 'undopush', label: 'Undo last push', words: 'undo push revert restore previous written', run: () => askUndoPush() }] : []),
+    ...(S.hosted ? [{ id: 'atlas', label: 'Import a dungeon from DMAtlas', words: 'dmatlas atlas dungeon import map rooms levels', run: () => set({ dialog: { kind: 'atlas' } }) }] : []),
     { id: 'trash', label: 'Open the trash', words: 'trash deleted restore recover bin', run: () => set({ dialog: { kind: 'trash' } }) },
     ...(S.helper ? [{ id: 'version', label: 'Version: roll back or forward', words: 'version rollback roll back forward downgrade', run: () => set({ dialog: { kind: 'version' } }) }] : []),
     { id: 'tour', label: 'Take the tour', words: 'tour help guide', run: () => startTour() },

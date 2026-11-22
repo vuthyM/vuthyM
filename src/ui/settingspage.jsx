@@ -224,6 +224,10 @@ function useItems() {
       <button class="btn btn-sm" id="setExport" onClick={() => exportSettings()}>Save my settings…</button>
       <label class="btn btn-sm" id="setImportLabel" style="cursor:pointer">Bring my settings in…<input type="file" id="setImportFile" accept="application/json,.json" style="display:none" onChange={e => { const f = e.currentTarget.files && e.currentTarget.files[0]; e.currentTarget.value = ''; askImportSettings(f); }} /></label>
     </Row>));
+  add('data', 'atlas', 'Import from DMAtlas', 'dmatlas atlas dungeon import map rooms levels pins', (
+    <Row key="atlas" id="atlas" title="Import from DMAtlas" desc={S.hosted ? 'Bring a dungeon over from DMAtlas: its picture on the map, and a note with a section and a pin for every room. Importing again keeps your text.' : 'Needs the DM Forge server (V3), which stores the pictures.'}>
+      <button class="btn btn-sm" id="setAtlas" disabled={!S.hosted || !S.campaign} onClick={() => set({ dialog: { kind: 'atlas' } })}>Import a dungeon…</button>
+    </Row>));
   add('data', 'trash', 'Trash', 'deleted notes restore recover', (
     <Row key="trash" id="trash" title="Trash" desc="Notes you deleted: see them and put one back.">
       <button class="btn btn-sm" id="setTrashBtn" onClick={() => set({ dialog: { kind: 'trash' } })}>Open the trash…</button>

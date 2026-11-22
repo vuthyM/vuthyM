@@ -4,6 +4,7 @@ import { Modal, assetUrl, copyText } from './common.jsx';
 import { openMapAt, goto, navTo } from './actions.js';
 import { SHORTCUTS, keysText } from '../core/shortcuts.js';
 import { playerSafe, removedSummary } from '../core/playersafe.js';
+import { secretRoomsFromPins } from '../core/atlas.js';
 import { distancesFrom, travelText, PACES, isMapNote, parsePins, fmtDistance } from '../core/maps.js';
 import { basename } from '../core/util.js';
 
@@ -42,7 +43,7 @@ export function PlayerSafeDialog({ d }) {
   const note = getIndex().byPath.get(d.path);
   const text = note ? S.working.get(note.path) : '';
   const [plain, setPlain] = useState(true);
-  const r = useMemo(() => playerSafe(text || '', note ? note.name : '', { plainLinks: plain }), [text, plain]);
+  const r = useMemo(() => playerSafe(text || '', note ? note.name : '', { plainLinks: plain, secretRooms: note ? secretRoomsFromPins(getIndex(), note) : [] }), [text, plain]);
   if (!note) return null;
   const sum = removedSummary(r.removed);
   return (

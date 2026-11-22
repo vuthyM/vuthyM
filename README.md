@@ -360,6 +360,23 @@ nightly plain-Markdown copy of the whole campaign, and the app keeps working wit
 the server will not overwrite a note that changed since you started). Everything about setting it up is in `deploy/DEPLOY-V3.md`;
 the plan and what is still to come are in `V3-PLAN.md`. The server can install new releases by itself (`update.sh`, checked every minute, with a database copy first and an automatic roll back). The Mac helper and folder mode are unchanged.
 
+## Dungeons from DMAtlas
+
+On the server (V3), **Maps, Import from DMAtlas…** (also the command palette, and Settings, Data) brings a dungeon over from DMAtlas. DMAtlas keeps the geometry (the picture,
+where each room is, its number and name); DM Forge keeps your writing. An import makes one note for the dungeon in a **Dungeons** folder with a section per room, in exactly this
+form so a re-import can find it: `## 2.1. The Hall <!-- room:ROOM-ID -->`, and one map note per level with the picture and a pin per room linking to `[[Rift Keep#2.1. The Hall]]`.
+Multi-level dungeons keep every level in the one note, grouped under level headings.
+
+- A room's starter text from DMAtlas is used once, when its section is first made. After that nothing under a heading is touched.
+- Re-importing finds rooms only by the hidden room marker: a moved room moves its pin; a renamed room changes only its heading and its pin's link; a new room gets a section and a pin;
+  a room DMAtlas no longer has is flagged "Removed in DMAtlas" and left for you to delete. An unchanged dungeon changes nothing, and an unchanged picture is not fetched again.
+- Pins point at a heading; clicking a pin and choosing **Open the room** (or double-clicking it) opens the note at that section.
+- Secret rooms: their sections, pins and markers stay out of **Player-safe copy** (the dungeon note lists them in its `secret-rooms` property).
+- The server fetches and checks everything (PNG, size, hash, same address only, no redirects) and stores the pictures under `<campaign>/Maps/<dungeon>/`, so they are in the backups and the export.
+- Everything is an ordinary unpushed change: Push, Discard all and Undo last push cover it.
+
+Set it up with `DMFORGE_DMATLAS_URL` in `.env` (see `deploy/DEPLOY-V3.md`). Core logic: `src/core/atlas.js`; the server side: `server/dmforge_atlas.py`.
+
 ## Your own monsters
 
 The **Monsters** button in the sidebar (under Reference; Ctrl+K "Monster library"; also Combat, Add, Monsters) opens the Monster library. **+ New monster** opens a

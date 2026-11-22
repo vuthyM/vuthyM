@@ -21,6 +21,7 @@ import { StarterDialog, SampleDialog } from './starter.jsx';
 import { headingOf } from '../core/rename.js';
 import { SettingsRedirect, LeaveEdit, MenuDialog } from './settings.jsx';
 import { TrashDialog, VersionDialog, NoteHistoryDialog } from './safety.jsx';
+import { AtlasDialog } from './atlas.jsx';
 import { ShortcutsDialog, PlayerSafeDialog } from './tools39.jsx';
 import { ImproviseDialog } from './prep40.jsx';
 
@@ -612,6 +613,7 @@ export function Dialogs() {
       {d && d.kind === 'menu' && <MenuDialog />}
       {d && d.kind === 'trash' && <TrashDialog />}
       {d && d.kind === 'noteHistory' && <NoteHistoryDialog path={d.path} />}
+      {d && d.kind === 'atlas' && <AtlasDialog />}
       {d && d.kind === 'shortcuts' && <ShortcutsDialog />}
       {d && d.kind === 'improv' && <ImproviseDialog d={d} />}
       {d && d.kind === 'playersafe' && <PlayerSafeDialog d={d} />}

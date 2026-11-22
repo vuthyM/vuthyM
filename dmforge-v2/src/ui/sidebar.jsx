@@ -156,7 +156,7 @@ export function Sidebar({ reload, leave, onNavigate }) {
             </div>
           ))}
           {dropAt !== null && dropAt >= favs.length && <div class="drop-line" />}
-          {!favs.length && <div class="drop-hint">Drag a page here to pin it, or hover one and click its star</div>}
+          {!favs.length && <div class="drop-hint">Drag a page here to pin it</div>}
         </div>
         {Object.keys(groups).map(g => {
           const isOpen = open === g;

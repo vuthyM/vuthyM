@@ -7,6 +7,14 @@ export const KINDS = { new: 'New', improved: 'Improved', fixed: 'Fixed' };
 
 export const CHANGELOG = [
   {
+    version: '2.56.0', date: '2026-11-22', title: 'Overview: one main button, and the little jobs in one block',
+    changes: [
+      ['improved', 'The Overview header has one main button for what comes next (Open session until you have played it, then + New session) and a "…" menu for the rest: the other of those two, Import last session and Start timer.'],
+      ['improved', 'Unpushed changes and "NPCs not in a place yet" now share one quiet block with a line between them, instead of two separate cards. "What am I forgetting?" is unchanged and fully visible.'],
+      ['improved', 'The empty Favourites box in the sidebar is one short line ("Drag a page here to pin it") instead of a tall dashed box.'],
+    ],
+  },
+  {
     version: '2.55.2', date: '2026-11-22', title: 'The server updater copes with a locked-down server',
     changes: [
       ['fixed', 'The automatic update refused to run on a server with its allowed host names set (DMFORGE_HOSTS), because its database copy went through the web address. It now copies the database directly with SQLite\'s own backup, which is safe while the app is running and keeps the last 20 copies as data/backups/pre-update-*.db.'],

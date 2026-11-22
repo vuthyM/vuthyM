@@ -15,7 +15,7 @@ FAKE_DOCKER = r'''#!/usr/bin/env bash
 echo "$*" >> "$FAKE_DIR/calls.log"
 case "$1 $2" in
   "compose ps") [ "${FAKE_RUNNING:-1}" = "1" ] && echo dmforge; exit 0 ;;
-  "compose exec") [ -n "${FAKE_BACKUP_FAIL:-}" ] && exit 1; exit 0 ;;
+  "compose exec") [ -n "${FAKE_BACKUP_FAIL:-}" ] && exit 1; case "$*" in *"cat /app/VERSION"*) [ -n "${FAKE_CONTAINER_VERSION:-}" ] && echo "$FAKE_CONTAINER_VERSION";; esac; exit 0 ;;
   "compose build") [ -n "${FAKE_BUILD_FAIL:-}" ] && { echo "build exploded"; exit 1; }; exit 0 ;;
   "compose up") exit 0 ;;
   "image inspect") exit 0 ;;
@@ -195,7 +195,14 @@ class UpdateTests(unittest.TestCase):
     def test_status(self):
         r = self.run_update('--status')
         self.assertEqual(r.returncode, 0)
-        self.assertIn('Running: 1.0.0', r.stdout)
+        self.assertIn('Files on disk: 1.0.0', r.stdout)
+        self.assertNotIn('Running in the container', r.stdout)           # nothing to report when it cannot be asked
+        r = self.run_update('--status', FAKE_CONTAINER_VERSION='1.0.0')
+        self.assertIn('Running in the container: 1.0.0', r.stdout)
+        self.assertNotIn('older build', r.stdout)
+        r = self.run_update('--status', FAKE_CONTAINER_VERSION='0.9.0')
+        self.assertIn('Running in the container: 0.9.0', r.stdout)
+        self.assertIn('older build', r.stdout)
 
     def test_not_a_git_checkout_says_so(self):
         shutil.rmtree(os.path.join(self.app, '.git'))

@@ -16,15 +16,15 @@ export const PALETTES = [
   {
     id: 'tide', label: 'Tide', blurb: 'Deep navy and cream with a rust accent',
     dark: {
-      bg: '#111b2c', surface: '#172338', surface2: '#1e2d46', border: '#2d405e',
-      fg: '#ebe4d4', fgMuted: '#a3afc2',
+      bg: '#0b1528', surface: '#101d35', surface2: '#172744', border: '#293d60',
+      fg: '#ebe4d4', fgMuted: '#9bacc5',
       accent: '#e8946a', accentFg: '#1d1008',
       danger: '#ef8a8a', good: '#7fcb9d', warn: '#e3bd6c',
       cPeople: '#bfa5ea', cPlaces: '#7fcdc4', cItems: '#8db6ee', cStory: '#b0cf84',
     },
     light: {
       bg: '#f2ecdf', surface: '#fbf8f0', surface2: '#e9e1d0', border: '#d5cab4',
-      fg: '#17243b', fgMuted: '#566379',
+      fg: '#122039', fgMuted: '#566379',
       accent: '#a64d1f', accentFg: '#fff7ee',
       danger: '#b3372f', good: '#2c7549', warn: '#855608',
       cPeople: '#6d4a8f', cPlaces: '#1f766e', cItems: '#2a5d9c', cStory: '#536c22',

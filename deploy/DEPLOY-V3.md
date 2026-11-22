@@ -108,14 +108,45 @@ You can also take a copy right now, with no downtime (it lands in `data/backups`
 docker compose exec dmforge python -c "import os,urllib.request as u;print(u.urlopen(u.Request('http://127.0.0.1:8765/api/backup',method='POST',headers={'X-DMF-Token':os.environ['DMFORGE_TOKEN']})).read())"
 ```
 
-## Updating
+## Updating (automatic)
+
+The server can install new versions by itself, within about a minute of one being released. It follows the `dmforge-release` branch on GitHub.
+Every minute it asks GitHub one small question ("has that branch moved?"). Nothing is opened to the internet: it only reaches out.
+
+**One-time setup** (on the server, inside `~/dmforge`; your `.env`, `data/` and `export/` are not touched):
 
 ```
-git pull          # or copy in the new files
-docker compose up -d --build
+cd ~/dmforge
+git init -q
+git remote add origin https://github.com/vuthyM/vuthyM.git
+git fetch --depth 1 origin dmforge-release
+git reset --hard FETCH_HEAD
+git branch -M dmforge-release
+./update.sh --status
 ```
 
-Open DM Forge pages show a "Reload to use it" bar when the server is running a newer version. Unpushed changes are kept.
+If `git fetch` asks for a password, the repository is private: tell Claude and a read-only key will be set up instead.
+
+Then start the minute-by-minute check:
+
+```
+crontab -l 2>/dev/null | grep -v update.sh > /tmp/cron.new
+printf 'PATH=/usr/local/bin:/usr/bin:/bin\n* * * * * %s/dmforge/update.sh >/dev/null 2>&1\n' "$HOME" >> /tmp/cron.new
+crontab /tmp/cron.new
+crontab -l
+```
+
+**What happens when a release is published**
+
+1. The database is copied to `data/backups/` first. If that copy fails, nothing is updated.
+2. The new files are downloaded and the new version is built while the old one keeps running.
+3. The container is swapped (a few seconds), then checked until it reports healthy.
+4. If the build fails or the new version is not healthy, the old version is put back automatically and that release is skipped until a newer one is published.
+5. Open DM Forge pages show "Reload to use it". Unpushed changes are kept, and the app copes with the few seconds the server is away.
+
+Everything is written to `~/dmforge/update.log`. `./update.sh --status` shows the version running and the last log lines; `./update.sh` checks right now.
+
+**To pause automatic updates:** `crontab -e` and put a `#` at the start of the update.sh line. **To go back to manual updates:** copy a zip over as before (the git folder is just files).
 
 ## Working with no connection
 

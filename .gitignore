@@ -5,3 +5,6 @@ export/
 .env
 __pycache__/
 *.pyc
+update.log
+.update.lock
+.update.bad

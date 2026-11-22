@@ -6,9 +6,11 @@ import sqlite3
 import sys
 import tempfile
 import threading
+import subprocess
 import unittest
 
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+HERE_DIR = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, HERE_DIR)
 import dmforge_db as D  # noqa: E402
 import dmforge_hosted as H  # noqa: E402
 import dmforge_io as IO  # noqa: E402
@@ -385,6 +387,12 @@ class HttpTests(unittest.TestCase):
             self.assertEqual(c.getresponse().status, 200)
             c.close()
             self.assertEqual(self.req('GET', '/healthz', token=False)[0], 200)  # the Docker health check needs no Host
+            # the machine talking to itself is always allowed (the updater, docker exec), even with the list set
+            self.assertEqual(self.req('GET', '/api/ping')[0], 200)                  # Host: 127.0.0.1:<port>
+            c = http.client.HTTPConnection('127.0.0.1', self.port, timeout=10)
+            c.request('GET', '/api/ping', headers={'Host': 'localhost:%d' % self.port, 'X-DMF-Token': self.token})
+            self.assertEqual(c.getresponse().status, 200)
+            c.close()
         finally:
             H.State.hosts = ()
 
@@ -501,6 +509,44 @@ class IoTests(unittest.TestCase):
             self.assertTrue(r['backup'] in os.listdir(bdir))
             self.assertEqual(r['export']['notes'], 1)
             self.assertTrue(os.path.exists(os.path.join(d, 'md', 'a.md')))
+            s.close()
+
+
+class UpdaterBackupTests(unittest.TestCase):
+    def test_the_updaters_database_copy_works_while_the_server_is_using_the_database(self):
+        # the very command update.sh runs inside the container, with the container's paths pointed at a temp folder
+        import re
+        script = open(os.path.join(os.path.dirname(HERE_DIR), 'update.sh')).read()
+        m = re.search(r'python -I -c "(import sys,os;sys\.path\.insert.*?)" >> "\$LOG"', script)
+        self.assertTrue(m, 'could not find the backup command in update.sh')
+        code = m.group(1).replace("'/app'", repr(HERE_DIR)).replace('$stamp', 'test')
+        with tempfile.TemporaryDirectory() as d:
+            s = D.Store(os.path.join(d, 'dmforge.db'))
+            s.write('a.md', b'important')
+            stop = threading.Event()
+            errs = []
+
+            def writer():
+                i = 0
+                while not stop.is_set():
+                    try:
+                        s.write('w%d.md' % (i % 20), ('t%d' % i).encode())
+                    except Exception as e:  # pragma: no cover
+                        errs.append(e)
+                    i += 1
+            th = threading.Thread(target=writer)
+            th.start()
+            try:
+                r = subprocess.run([sys.executable, '-I', '-c', code], env={'DMFORGE_DATA': d, 'PATH': os.environ['PATH']}, capture_output=True, text=True)
+            finally:
+                stop.set()
+                th.join()
+            self.assertEqual(r.returncode, 0, r.stderr)
+            self.assertEqual(errs, [])
+            c = sqlite3.connect(os.path.join(d, 'backups', 'pre-update-test.db'))
+            self.assertEqual(c.execute('PRAGMA integrity_check').fetchone()[0], 'ok')
+            self.assertEqual(c.execute("SELECT content FROM files WHERE path='a.md'").fetchone()[0], b'important')
+            c.close()
             s.close()
 
 

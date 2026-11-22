@@ -51,12 +51,15 @@ main() {
   old_version="$(cat VERSION 2>/dev/null || echo unknown)"
   log "New release found (${remote:0:7}, you have ${current:0:7}). Updating from $old_version."
 
-  # 1. a copy of the database first
+  # 1. a copy of the database first, made with SQLite's own backup (safe while the app is running, needs no web address or token)
   if docker compose ps --status running --services 2>/dev/null | grep -qx dmforge; then
-    if ! docker compose exec -T dmforge python -c "import os,urllib.request as u;u.urlopen(u.Request('http://127.0.0.1:'+os.environ.get('DMFORGE_PORT','8765')+'/api/backup',method='POST',headers={'X-DMF-Token':os.environ['DMFORGE_TOKEN']}),timeout=60).read()" >/dev/null 2>&1; then
-      log "Could not take a database copy, so NOT updating. (Is the app healthy? Try ./update.sh again in a minute.)"
+    stamp="$(date +%Y%m%d-%H%M%S)"
+    if ! docker compose exec -T dmforge python -I -c "import sys,os;sys.path.insert(0,'/app');import dmforge_db as D;D.Store(os.path.join(os.environ.get('DMFORGE_DATA','/data'),'dmforge.db')).backup_to(os.path.join(os.environ.get('DMFORGE_DATA','/data'),'backups','pre-update-$stamp.db'))" >> "$LOG" 2>&1; then
+      log "Could not take a database copy, so NOT updating. (Is the app healthy? Try ./update.sh again in a minute; the reason is just above in update.log.)"
       return 1
     fi
+    # keep the last 20 of these (the nightly copies are looked after by the server itself)
+    ls -1t data/backups/pre-update-*.db 2>/dev/null | tail -n +21 | xargs -r rm -f
   fi
 
   # 2. fetch and build; the running container is untouched until this works

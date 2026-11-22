@@ -7,6 +7,13 @@ export const KINDS = { new: 'New', improved: 'Improved', fixed: 'Fixed' };
 
 export const CHANGELOG = [
   {
+    version: '2.55.2', date: '2026-11-22', title: 'The server updater copes with a locked-down server',
+    changes: [
+      ['fixed', 'The automatic update refused to run on a server with its allowed host names set (DMFORGE_HOSTS), because its database copy went through the web address. It now copies the database directly with SQLite\'s own backup, which is safe while the app is running and keeps the last 20 copies as data/backups/pre-update-*.db.'],
+      ['fixed', 'The server now always answers requests the machine makes to itself (localhost, 127.0.0.1), even when DMFORGE_HOSTS is set, so commands run on the server itself keep working.'],
+    ],
+  },
+  {
     version: '2.55.1', date: '2026-11-22', title: 'The server updates itself',
     changes: [
       ['new', 'On your own server, DM Forge can now install new versions by itself within about a minute of one being released: it checks GitHub every minute (it only reaches out, nothing is opened), copies the database first, builds the new version while the old one keeps running, swaps it, and waits for it to be healthy. If the build fails or the new version does not come up healthy, the old version is put back and that release is skipped. ./update.sh --status shows what is running; the log is update.log. See deploy/DEPLOY-V3.md.'],

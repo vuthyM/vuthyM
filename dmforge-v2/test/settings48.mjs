@@ -99,9 +99,11 @@ for (const id of Object.keys(wantFonts)) {
 check('no font or anything else was fetched from the internet', external.length === 0, external.join(' '));
 await pg.check('#setFont-storybook');
 await pg.reload(); await pg.click('text=Try the demo vault'); await pg.waitForSelector('.sidebar');
+await pg.waitForFunction(() => document.documentElement.dataset.type === 'storybook'); await pg.evaluate(() => document.fonts.ready); await pg.waitForTimeout(250);
 check('the choice survives a restart', (await pg.evaluate(() => document.documentElement.dataset.type)) === 'storybook' && (await fam('body')) === 'Alegreya Sans');
 await pg.evaluate(() => localStorage.setItem('dmforge:settings', JSON.stringify({ fontSet: 'comic-sans' })));
 await pg.reload(); await pg.click('text=Try the demo vault'); await pg.waitForSelector('.sidebar');
+await pg.evaluate(() => document.fonts.ready); await pg.waitForTimeout(400);
 check('an unknown saved typeface is ignored (Today)', (await pg.evaluate(() => document.documentElement.dataset.type)) === undefined && (await fam('body')) === 'Work Sans');
 
 /* ---- the other ways in */

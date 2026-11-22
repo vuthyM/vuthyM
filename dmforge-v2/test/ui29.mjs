@@ -58,11 +58,13 @@ await pg.click('#pinNote');
 await pg.waitForFunction(() => document.querySelectorAll('.nav-fav').length === 2);
 check('a note can be pinned from its ⋯ menu', await pg.locator('.nav-fav').count() === 2);
 
-// ---- two dark styles
+// ---- two dark styles (a Classic option: the colour themes have one dark each)
+await pg.evaluate(() => window.__dmforge.A.updateSetting('palette', 'classic')); await pg.waitForTimeout(3300);
 const warm = await bg();
 check('dark mode is the warm style by default', warm === 'rgb(24, 23, 20)', warm);
 await dom('#navSettings');
 await pg.waitForSelector('#menuSettings', { state: 'attached' });
+await pg.evaluate(() => window.__dmforge.A.updateSetting('palette', 'classic'));
 await pg.click('#menuSettings'); await pg.click('[data-setcat="appearance"]'); await pg.waitForSelector('#setDarkSlate');
 await pg.click('#setDarkSlate');
 await pg.waitForTimeout(3300);

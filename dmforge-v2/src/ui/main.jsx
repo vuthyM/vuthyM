@@ -12,6 +12,7 @@ import * as L from './libraryactions.js';
 import { Toasts } from './common.jsx';
 import { FsaVault, MemoryVault } from '../core/vault.js';
 import './fonts.css';
+import './palettes.css';
 import './styles.css';
 
 function App() {

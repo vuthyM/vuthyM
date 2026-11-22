@@ -7,6 +7,15 @@ export const KINDS = { new: 'New', improved: 'Improved', fixed: 'Fixed' };
 
 export const CHANGELOG = [
   {
+    version: '2.57.0', date: '2026-11-22', title: 'New colours: Tide, Fig and Olive',
+    changes: [
+      ['new', 'A new colour system with three themes, chosen in Settings, Appearance, Colour theme. Tide is the default: deep navy with cream and a soft rust accent. Fig is plum with cream and dusty rose. Olive is deep olive with cream and a leaf-green accent. Each has a dark and a matching light version that follow Auto, Light and Dark as before. Classic (the original brown and gold) is still there to switch back to.'],
+      ['improved', 'Softer, deeper and less brown. The dark themes use a rich base hue instead of near-black, off-white text instead of bright white, and low-contrast borders; the light themes are cream with dark ink. Every text colour is checked for readability (at least 4.5 to 1), and the kind colours (people, places, items, story) are tuned to each theme.'],
+      ['improved', 'The accent is restrained: a solid accent colour means "do this" (the main button, Push), while the active page in the sidebar is a soft tint with accent-coloured text. A campaign can still have its own accent colour, which beats the theme\'s.'],
+      ['improved', 'The Dark mode style choice (Warm or Blue-grey) now belongs to Classic only, since each theme has its own dark. The favicon follows the new default accent.'],
+    ],
+  },
+  {
     version: '2.56.0', date: '2026-11-22', title: 'Overview: one main button, and the little jobs in one block',
     changes: [
       ['improved', 'The Overview header has one main button for what comes next (Open session until you have played it, then + New session) and a "…" menu for the rest: the other of those two, Import last session and Start timer.'],

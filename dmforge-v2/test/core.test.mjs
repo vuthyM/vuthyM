@@ -3703,3 +3703,38 @@ test('sessions: the next one is the one above in the newest-first list', () => {
   assert.equal(nextSession(idx, 'c'), null);
   assert.equal(nextSession(idx, 'zzz'), null);
 });
+
+/* ---- colour themes ---- */
+import { PALETTES, PALETTE_IDS, DEFAULT_PALETTE, paletteId, paletteCss, contrast } from '../src/core/palettes.js';
+test('palettes: every text pair is readable in dark and light', () => {
+  for (const p of PALETTES) for (const m of ['dark', 'light']) {
+    const t = p[m], tag = p.id + ' ' + m;
+    const need = (name, a, b, min) => assert.ok(contrast(a, b) >= min, tag + ' ' + name + ' is ' + contrast(a, b).toFixed(2) + ', needs ' + min);
+    need('text on the page', t.fg, t.bg, 7); need('text on a card', t.fg, t.surface, 7);
+    need('quiet text on the page', t.fgMuted, t.bg, 4.5); need('quiet text on a card', t.fgMuted, t.surface, 4.5); need('quiet text on a raised area', t.fgMuted, t.surface2, 4.5);
+    need('accent as a link on the page', t.accent, t.bg, 4.5); need('accent as a link on a card', t.accent, t.surface, 4.5); need('text on the accent button', t.accentFg, t.accent, 4.5);
+    need('danger', t.danger, t.surface, 4.5); need('good', t.good, t.surface, 4.5); need('warn', t.warn, t.surface, 4.5);
+    for (const k of ['cPeople', 'cPlaces', 'cItems', 'cStory']) need(k, t[k], t.surface, 4.5);
+  }
+});
+test('palettes: the dark ones are not harsh (text is off-white, not pure white, and not too far from the page)', () => {
+  for (const p of PALETTES) { assert.ok(contrast(p.dark.fg, p.dark.bg) < 16, p.id + ' dark text/page contrast should stay under 16'); assert.notEqual(p.dark.fg.toLowerCase(), '#ffffff'); }
+});
+test('palettes: ids, default, and the committed stylesheet matches the source', () => {
+  assert.deepEqual(PALETTE_IDS, ['classic', 'tide', 'fig', 'olive']);
+  assert.equal(DEFAULT_PALETTE, 'tide');
+  assert.equal(paletteId('nonsense'), 'tide'); assert.equal(paletteId('fig'), 'fig'); assert.equal(paletteId('classic'), 'classic');
+  assert.equal(fs.readFileSync(new URL('../src/ui/palettes.css', import.meta.url), 'utf8'), paletteCss(), 'run node build.mjs to regenerate src/ui/palettes.css');
+  const css = paletteCss();
+  for (const p of PALETTES) { assert.ok(css.includes(':root[data-palette="' + p.id + '"]{')); assert.ok(css.includes(':root[data-palette="' + p.id + '"][data-theme="dark"]{')); assert.ok(css.includes('@media (prefers-color-scheme: dark){:root[data-palette="' + p.id + '"]:not([data-theme="light"])')); }
+});
+
+test('palettes: the active-page text (accent nudged toward the text colour) stays readable on its soft tint of the accent', () => {
+  const hex = n => '#' + [n >> 16 & 255, n >> 8 & 255, n & 255].map(v => v.toString(16).padStart(2, '0')).join('');
+  const mix = (a, b, t) => { const x = parseInt(a.slice(1), 16), y = parseInt(b.slice(1), 16); const m = s => Math.round(((x >> s) & 255) * t + ((y >> s) & 255) * (1 - t)); return hex((m(16) << 16) | (m(8) << 8) | m(0)); };
+  for (const p of PALETTES) for (const m of ['dark', 'light']) for (const under of ['bg', 'surface', 'surface2']) {
+    const t = p[m];
+    const ink = mix(t.accent, t.fg, 0.7), tint = mix(t.accent, t[under], 0.12);
+    assert.ok(contrast(ink, tint) >= 4.5, p.id + ' ' + m + ' on ' + under + ': ' + contrast(ink, tint).toFixed(2));
+  }
+});

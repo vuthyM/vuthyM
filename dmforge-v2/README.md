@@ -615,6 +615,13 @@ note can be pinned from its ... menu. Favourites are kept per campaign in this b
 Menu, Settings has **Dark mode style**: Warm (default) or Blue-grey. The top bar is icon-only, with a Push button that always
 says what it will do. Below 900 px wide the sidebar becomes a drawer; below 700 px the table tools sit in a bottom bar.
 
+## Colour themes
+
+**Settings, Appearance, Colour theme** picks the colours of the whole app: **Tide** (the default: deep navy, cream and a soft rust accent), **Fig** (plum, cream, dusty rose),
+**Olive** (deep olive, cream, leaf green) or **Classic** (the original brown and gold). Each has a dark and a light version that follow Auto / Light / Dark. The accent is
+restrained: a solid accent means "do this" (the main button), the active page in the sidebar is a soft tint. A campaign's own accent colour (Settings, Colour of this
+campaign) still overrides the theme's. The colours live in `src/core/palettes.js` (which also holds the contrast check); `build.mjs` writes `src/ui/palettes.css` from it.
+
 ## Light and dark
 
 Light and dark are in the **View** menu in the top bar (and the sun/moon button on the welcome screen); either switches mode, and every colour fades over 3 seconds

@@ -90,7 +90,7 @@ A session's page has a **Live** button (or Ctrl+K, Live mode, for the session yo
 **Improvise an NPC** rolls someone, lets you pick where they are, and saves them into the session's cast. In the quick log, type `@name` or `[[name` and
 choose *Create … as an NPC, place or item* to make a note on the spot. **Prep check** lists what is not ready (with fixes), **Outline** jumps between and moves
 sections, and the cast strip suggests *who is likely there* from the places the session mentions. On the Party page, **Save to session** writes the encounter
-you lined up into the session as a prepared encounter, and **Run in Combat** puts its monsters in the fight. **Edit** on a prepared encounter (session page) changes its name and
+you lined up into the session as a prepared encounter, and **Run in Combat** puts its monsters in the fight. **Run in Combat** also writes `> Ran in combat: <date>` inside the encounter (the card then shows "Ran" and offers **Run again**). Encounters you never ran can be moved on: **Move to next session** on the card, or the strip in **Wrap up** that moves them all (a new next session is made if there is none yet; nothing is written until you push). **Edit** on a prepared encounter (session page) changes its name and
 creatures in place: one more or fewer, a typed number, a different creature, Remove, and an Add box that suggests creatures from your library; Save changes writes it into the note.
 **Add template** also has Dungeon crawl, Intrigue,
 Travel and One-shot layouts.

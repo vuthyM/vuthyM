@@ -9,7 +9,7 @@ import { insertAt } from '../core/sessiontemplates.js';
 import { timeAgo } from '../core/leftoff.js';
 import { EditableBody } from './editbody.jsx';
 import { CastStrip } from './cast.jsx';
-import { LivePanel, OutlineBar, ReadinessCard, EncountersCard } from './prep40.jsx';
+import { LivePanel, OutlineBar, ReadinessCard, EncountersCard, UnrunStrip } from './prep40.jsx';
 import { castOf } from '../core/cast.js';
 import { notePrompt, CLAUDE_SYSTEM, QUESTION_MARK } from '../core/claudeprompts.js';
 import { TYPES, OTHER, fieldDefs, getField, toStored, displayValue, typeInfo } from '../core/schema.js';
@@ -528,6 +528,7 @@ function SessionPage({ note, idx }) {
       </div>
       {mode === 'run' && live && <LivePanel note={note} />}
       {mode === 'wrap' && <TidyStrip path={note.path} />}
+      {mode === 'wrap' && <UnrunStrip note={note} />}
       <ReformatBar note={note} />
       {mode === 'prep' && <LeftOff note={note} />}
       {mode === 'prep' && <CastFold note={note} idx={idx} />}

@@ -3669,3 +3669,37 @@ test('settings bundle: rejects files that are not settings', () => {
   assert.ok(parseBundle('{"app":"other"}').error);
   assert.ok(parseBundle(JSON.stringify({ app: 'dmforge-settings', format: 2, local: {} })).error);
 });
+
+/* ---- encounters that were run, and moving the ones that were not ---- */
+import { parseEncounters as pEnc, markRan, movableBlock, addEncounterText } from '../src/core/encounters.js';
+import { nextSession } from '../src/core/lastsession.js';
+test('encounters: a run encounter carries a dated line and is not offered for moving', () => {
+  const body = '## Prep\n\n> [!danger]- Encounter: Ambush\n> - 3× Goblin\n> - 1× Bugbear\n> Open with the archers.\n\nText after.\n';
+  const e = pEnc(body)[0];
+  assert.equal(e.ran, null);
+  const ran = markRan(body, e, '2026-11-22');
+  assert.ok(ran.includes('> - 1× Bugbear\n> Ran in combat: 2026-11-22\n> Open with the archers.'));
+  const e2 = pEnc(ran)[0];
+  assert.equal(e2.ran, '2026-11-22');
+  assert.deepEqual(e2.items.map(i => i.qty + 'x' + i.name), ['3xGoblin', '1xBugbear']);
+  assert.equal(markRan(ran, e2, '2026-11-30').match(/Ran in combat/g).length, 1);        // run again: one line, newest date
+  assert.equal(pEnc(markRan(ran, e2, '2026-11-30'))[0].ran, '2026-11-30');
+  assert.ok(ran.endsWith('Text after.\n'));
+});
+test('encounters: moving takes the callout (tactics line too) without the ran line', () => {
+  const body = '## Prep\n\n> [!danger]- Encounter: Ambush\n> - 3× Goblin\n> Open with the archers.\n';
+  const block = movableBlock(pEnc(markRan(body, pEnc(body)[0], '2026-11-22'))[0]);
+  assert.equal(block, '> [!danger]- Encounter: Ambush\n> - 3× Goblin\n> Open with the archers.');
+  const dest = addEncounterText('# Session 2\n\n## Prep\n\n## Recap\n', block);
+  const e = pEnc(dest)[0];
+  assert.equal(e.title, 'Ambush');
+  assert.deepEqual(e.items, [{ qty: 3, name: 'Goblin' }]);
+  assert.ok(dest.indexOf('Encounter: Ambush') < dest.indexOf('## Recap'));
+});
+test('sessions: the next one is the one above in the newest-first list', () => {
+  const idx = { byType: { session: [{ path: 'c' }, { path: 'b' }, { path: 'a' }] } };
+  assert.equal(nextSession(idx, 'a').path, 'b');
+  assert.equal(nextSession(idx, 'b').path, 'c');
+  assert.equal(nextSession(idx, 'c'), null);
+  assert.equal(nextSession(idx, 'zzz'), null);
+});

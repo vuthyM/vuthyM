@@ -4,11 +4,18 @@
      > - 3× Goblin
      > - 1× Bugbear
 
-   Plain Obsidian markdown, so it reads fine there too. */
+   Plain Obsidian markdown, so it reads fine there too.
+
+   When an encounter is run in Combat a line is added inside it, so DM Forge (and you, reading the note) can tell it was used:
+
+     > Ran in combat: 2026-11-22
+
+   An encounter without that line was never run, and can be moved to the next session. */
 import { placeTemplate } from './sessiontemplates.js';
 import { crXp } from './monsters.js';
 
 const HEAD = /^>\s*\[!danger\][+-]?\s*Encounter\s*[:—–-]?\s*(.*?)\s*$/i;
+const RAN = /^>\s*Ran in combat(?:\s*[:—–-]\s*|\s+)(\d{4}-\d{2}-\d{2})\s*$/i;
 const ITEM = /^>\s*[-*]\s+(?:(\d{1,2})\s*[×xX]\s*(.+?)|(.+?)\s*[×xX]\s*(\d{1,2}))\s*$/;
 
 export function parseEncounters(body) {
@@ -19,12 +26,15 @@ export function parseEncounters(body) {
     if (!h) continue;
     let end = i + 1;
     const items = [];
+    let ran = null;
     while (end < lines.length && /^>/.test(lines[end])) {
+      const r = RAN.exec(lines[end]);
+      if (r) ran = r[1];
       const m = ITEM.exec(lines[end]);
       if (m) items.push({ qty: Math.max(1, parseInt(m[1] || m[4], 10)), name: (m[2] || m[3]).replace(/\*\*|_/g, '').trim() });
       end++;
     }
-    out.push({ title: h[1] || 'Encounter', start: i, end, items, head: lines[i] });
+    out.push({ title: h[1] || 'Encounter', start: i, end, items, head: lines[i], ran, text: lines.slice(i, end).join('\n') });
     i = end - 1;
   }
   return out;
@@ -70,4 +80,25 @@ export function replaceEncounter(body, enc, title, items) {
   const fresh = ['> [!danger]' + marker + ' Encounter: ' + t, ...items.map(x => '> - ' + Math.max(1, Math.min(99, x.qty | 0)) + '× ' + String(x.name).replace(/\s+/g, ' ').trim()), ...keep];
   lines.splice(enc.start, enc.end - enc.start, ...fresh);
   return lines.join('\n');
+}
+
+/* notes that this encounter was run (on `date`), replacing an earlier note of the same kind. Returns the new body. */
+export function markRan(body, enc, date) {
+  const lines = String(body).replace(/\r\n/g, '\n').split('\n');
+  const keep = lines.slice(enc.start + 1, enc.end).filter(l => !RAN.test(l));
+  let at = 0;                                                       // after the last creature line, or straight after the head
+  keep.forEach((l, k) => { if (ITEM.test(l)) at = k + 1; });
+  keep.splice(at, 0, '> Ran in combat: ' + date);
+  lines.splice(enc.start + 1, enc.end - enc.start - 1, ...keep);
+  return lines.join('\n');
+}
+
+/* the encounter as it should be written into another session: the same callout, without the "ran" line */
+export function movableBlock(enc) {
+  return enc.text.split('\n').filter(l => !RAN.test(l)).join('\n');
+}
+
+/* puts an encounter written out as markdown (see movableBlock) into a session's prep; returns the new body */
+export function addEncounterText(body, text) {
+  return placeTemplate(String(body).replace(/\r\n/g, '\n'), 'encounter', text).text;
 }

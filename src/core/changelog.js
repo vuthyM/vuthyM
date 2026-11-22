@@ -7,6 +7,13 @@ export const KINDS = { new: 'New', improved: 'Improved', fixed: 'Fixed' };
 
 export const CHANGELOG = [
   {
+    version: '2.54.0', date: '2026-11-22', title: 'Prepared encounters you did not get to move to the next session',
+    changes: [
+      ['new', 'Running a prepared encounter in Combat now writes a dated line inside it ("Ran in combat: 2026-11-22"), so the note shows what was used. Its card shows "Ran …" and the button becomes "Run again".'],
+      ['new', 'Encounters that were never run can be moved on. Each one has "Move to next session", and the Wrap up mode of the session page lists everything that was not run with one button, "Move to <next session>". The callout moves with its notes; if there is no next session yet, a new one is made (the pinned session and the log box stay where they were). Nothing is written until you push, so Discard all undoes it.'],
+    ],
+  },
+  {
     version: '2.53.1', date: '2026-11-22', title: 'Move your settings to another device or to the server',
     changes: [
       ['new', 'Settings, Data: "Save my settings…" writes your theme, fonts, layout, favourites, list views, folder-to-type guesses and where you left off to one small file, and "Bring my settings in…" reads it on another device, browser or server. Settings that belong to one vault and campaign follow you to the new vault name. Notes, unpushed changes, a fight in progress and the timer are not part of it.'],

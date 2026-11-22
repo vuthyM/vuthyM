@@ -33,7 +33,7 @@ import { writeField } from '../core/fieldwrite.js';
 import { planRename } from '../core/rename.js';
 import { secretsFrom, secretLine, setRevealed } from '../core/secrets.js';
 import { buildStarter } from '../core/starter.js';
-import { lastSessionData, putLastTime, previousSession, FROM_LABEL } from '../core/lastsession.js';
+import { lastSessionData, putLastTime, previousSession, nextSession, FROM_LABEL } from '../core/lastsession.js';
 import { TOUR, TOUR_KEY } from '../core/tour.js';
 import { FONT_SET_IDS } from '../core/fontsets.js';
 import { spotlightStats, removeSpotlightMoment, spotlightLines, namesPlayer } from '../core/spotlight.js';
@@ -43,7 +43,7 @@ import { locationTree, canMoveInto } from '../core/locations.js';
 import { addToCast, copyName, copyText, rollOne } from '../core/cast.js';
 import { moveSection } from '../core/prep40.js';
 import { ACCENTS, accentKey } from '../core/accent.js';
-import { addEncounter, removeEncounter, parseEncounters, replaceEncounter } from '../core/encounters.js';
+import { addEncounter, removeEncounter, parseEncounters, replaceEncounter, markRan, movableBlock, addEncounterText } from '../core/encounters.js';
 import { GENERATORS } from '../core/generators.js';
 import { CLOCKS_NOTE, readLists, writeLists, standingLabel } from '../core/clocks.js';
 import { rollDice } from '../core/roller.js';
@@ -2259,11 +2259,53 @@ export function editEncounterIn(sessionPath, start, title, items) {
   return true;
 }
 /* run a prepared encounter: its monsters go into the fight (one is started if there is none), logging to this session */
-export function runEncounterFrom(sessionPath, found) {
+export function runEncounterFrom(sessionPath, found, start) {
   const n = addMonstersToCombat(found.map(x => ({ m: x.m, qty: x.qty })));
+  if (start !== undefined) markEncounterRan(sessionPath, start);
   set({ combatTarget: sessionPath });
   setSection('combat');
   return n;
+}
+/* note inside the session that this encounter was run, so it is not offered for moving to the next session */
+function markEncounterRan(sessionPath, start) {
+  const n = getIndex().byPath.get(sessionPath);
+  const enc = n && parseEncounters(n.body).find(e => e.start === start);
+  if (enc) saveNoteEdit(sessionPath, { body: markRan(n.body, enc, today()) });
+}
+/* the prepared encounters of a session that were never run, and where they would go: the next session, or a new one if there is none yet */
+export function unrunEncounters(sessionPath) {
+  const idx = getIndex();
+  const n = idx && idx.byPath.get(sessionPath);
+  if (!n) return { encs: [], next: null };
+  return { encs: parseEncounters(n.body).filter(e => !e.ran), next: nextSession(idx, sessionPath) };
+}
+/* moves prepared encounters (given by the line each starts on) out of this session and into the next one. Nothing is written until you push.
+   If there is no next session yet, one is made (dated today: change its date in its properties). */
+export function moveEncountersToNext(sessionPath, starts) {
+  const idx = getIndex();
+  const n = idx.byPath.get(sessionPath);
+  if (!n) return null;
+  const encs = parseEncounters(n.body).filter(e => starts.includes(e.start));
+  if (!encs.length) return null;
+  let target = nextSession(idx, sessionPath);
+  let targetPath = target && target.path, created = false;
+  if (!targetPath) {
+    const keep = currentSessionPath();
+    targetPath = createSession({ title: '', date: today(), number: nextSessionNumber(), word: sessionPrefix() });
+    setCurrentSession(keep || sessionPath);                         // wrapping up this one: the log box and the pinned session stay where they were
+    created = true;
+  }
+  const dest = getIndex().byPath.get(targetPath);
+  let body = dest.body;
+  for (const e of encs) body = addEncounterText(body, movableBlock(e));
+  saveNoteEdit(targetPath, { body });
+  let src = getIndex().byPath.get(sessionPath).body;
+  for (const e of [...encs].sort((a, b) => b.start - a.start)) {
+    const cur = parseEncounters(src).find(x => x.start === e.start);
+    if (cur) src = removeEncounter(src, cur);
+  }
+  saveNoteEdit(sessionPath, { body: src });
+  return { moved: encs.length, path: targetPath, name: getIndex().byPath.get(targetPath).name, created };
 }
 export function loadEncounterToBudget(found) {
   setEncounter(found.map(x => ({ key: x.m.key, qty: x.qty })));

@@ -78,3 +78,10 @@ export function previousSession(idx, path) {
   const i = list.findIndex(n => n.path === path);
   return i >= 0 ? list[i + 1] || null : list[0] || null;
 }
+
+/* the session after this one (the next one to be played): sessions are newest first, so it is the one just above; null for the newest */
+export function nextSession(idx, path) {
+  const list = idx.byType.session || [];
+  const i = list.findIndex(n => n.path === path);
+  return i > 0 ? list[i - 1] : null;
+}

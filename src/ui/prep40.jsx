@@ -2,7 +2,7 @@ import { useMemo, useRef, useState } from 'preact/hooks';
 import { S, set, useApp, getIndex, toast } from './store.js';
 import { Modal, Inline, plainInline } from './common.jsx';
 import { subtitle } from './notes.jsx';
-import { openBeside, setCurrentSession, currentSessionPath, logLine, sessionLogEntries, tickTask, tickClock, clocksNow, secretsNow, setSecretRevealed, setLive, rollImprov, saveImprov, moveSectionIn, addMustBlock, importLastSession, lastSessionInfo, setSection, saveEncounterTo, editEncounterIn, deleteEncounterFrom, runEncounterFrom, loadEncounterToBudget } from './actions.js';
+import { openBeside, setCurrentSession, currentSessionPath, logLine, sessionLogEntries, tickTask, tickClock, clocksNow, secretsNow, setSecretRevealed, setLive, rollImprov, saveImprov, moveSectionIn, addMustBlock, importLastSession, lastSessionInfo, setSection, saveEncounterTo, editEncounterIn, deleteEncounterFrom, runEncounterFrom, loadEncounterToBudget, unrunEncounters, moveEncountersToNext } from './actions.js';
 import { castOf } from '../core/cast.js';
 import { outline, mustItems, readiness } from '../core/prep40.js';
 import { parseEncounters, resolveItems, xpOf } from '../core/encounters.js';
@@ -254,13 +254,14 @@ export function EncountersCard({ note, hideEmpty }) {
         const d = difficulty(xpOf(found), b);
         return (
           <div key={e.start} class="enc-row" data-enc={e.title}>
-            <div class="enc-title"><b>{e.title}</b> <span class={'pill ' + (d.tier === 'over' ? 'pill-bad' : d.tier === 'high' ? 'pill-warn' : 'pill-good')} data-diff={d.tier}>{d.label}</span></div>
+            <div class="enc-title"><b>{e.title}</b> {e.ran && <span class="pill" data-ran={e.ran} title={'Run in combat on ' + e.ran}>Ran {e.ran}</span>} <span class={'pill ' + (d.tier === 'over' ? 'pill-bad' : d.tier === 'high' ? 'pill-warn' : 'pill-good')} data-diff={d.tier}>{d.label}</span></div>
             {editing === e.start ? <EncounterEditor key={e.start} note={note} enc={e} all={all} onDone={() => setEditing(null)} /> : <>
             <div class="small">{e.items.map(i => i.qty + '× ' + i.name).join(', ')}</div>
             {missing.length > 0 && <div class="small muted">Not in the library: {missing.map(m => m.name).join(', ')}</div>}
             <div class="row-actions" style="margin-top:6px">
               <button class="btn btn-sm" data-editenc={e.title} onClick={() => setEditing(e.start)}>Edit</button>
-              <button class="btn btn-sm btn-primary" data-run={e.title} disabled={!found.length} onClick={() => { const n = runEncounterFrom(note.path, found); toast('Added ' + plural(n, 'creature') + ' to the fight, with initiative rolled.'); }}>Run in Combat</button>
+              <button class={'btn btn-sm' + (e.ran ? '' : ' btn-primary')} data-run={e.title} disabled={!found.length} onClick={() => { const n = runEncounterFrom(note.path, found, e.start); toast('Added ' + plural(n, 'creature') + ' to the fight, with initiative rolled.'); }}>{e.ran ? 'Run again' : 'Run in Combat'}</button>
+              {!e.ran && <button class="btn btn-sm" data-moveenc={e.title} title="Take this encounter out of this session and put it in the next one" onClick={() => { const r = moveEncountersToNext(note.path, [e.start]); if (r) toast('Moved “' + e.title + '” to ' + r.name + (r.created ? ' (a new session)' : '') + '. Push changes to keep it.'); }}>Move to next session</button>}
               <button class="btn btn-sm" data-load={e.title} disabled={!found.length} onClick={() => loadEncounterToBudget(found)}>Open in the budget</button>
               <button class="btn btn-sm btn-ghost" data-delenc={e.title} onClick={() => { deleteEncounterFrom(note.path, e.start); toast('Removed that encounter from the session.'); }}>Remove</button>
             </div></>}
@@ -289,6 +290,26 @@ export function SaveEncounterBar({ items }) {
       <input ref={ref} id="ebTitle" aria-label="Name for this encounter" placeholder="Name this encounter, e.g. Ambush at the weir" value={title} onInput={e => setTitle(e.currentTarget.value)} style="flex:1;min-width:200px;max-width:340px" />
       <select id="ebSession" aria-label="Session to save it in" style="width:auto;max-width:240px" value={path || sessions[0].path} onChange={e => setPath(e.currentTarget.value)}>{sessions.map(n => <option key={n.path} value={n.path}>{n.name}</option>)}</select>
       <button class="btn" id="ebSave" disabled={!items.length} onClick={go}>Save to session</button>
+    </div>
+  );
+}
+
+
+/* Wrap up: prepared encounters that were never run, offered for the next session */
+export function UnrunStrip({ note }) {
+  useApp();
+  const [hidden, setHidden] = useState(false);
+  const { encs, next } = unrunEncounters(note.path);
+  if (!encs.length || hidden) return null;
+  const go = () => {
+    const r = moveEncountersToNext(note.path, encs.map(e => e.start));
+    if (r) toast('Moved ' + plural(r.moved, 'encounter') + ' to ' + r.name + (r.created ? ' (a new session: set its date in its properties)' : '') + '. Push changes to keep ' + (r.moved === 1 ? 'it' : 'them') + '.');
+  };
+  return (
+    <div class="tidy-strip small" id="unrunStrip">
+      <span><b>{plural(encs.length, 'prepared encounter')}</b> {encs.length === 1 ? 'was' : 'were'} never run{encs.length <= 3 ? ': ' + encs.map(e => e.title).join(', ') : ''}.</span>
+      <button class="btn btn-sm btn-primary" id="unrunMove" onClick={go}>{next ? 'Move to ' + next.name : 'Move to a new next session'}</button>
+      <button class="btn btn-sm btn-ghost" id="unrunKeep" onClick={() => setHidden(true)}>Keep here</button>
     </div>
   );
 }

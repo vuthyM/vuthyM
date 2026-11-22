@@ -1,5 +1,6 @@
 import { S, set, setNow, setNavGuard, loadRecent, pushRecent, getDraft, dirtyDrafts, touch, flushPending, toast, emit, getIndex, makeTab, resetTabs } from './store.js';
-import { FsaVault, MemoryVault, HttpVault, trashOriginal } from '../core/vault.js';
+import { FsaVault, MemoryVault, HttpVault, ServerVault, trashOriginal } from '../core/vault.js';
+import { startRemote, remoteBeforeLoad } from './remote.js';
 import { demoFiles, DEMO_CAMPAIGN, DEMO_VAULT_NAME } from '../core/demo.js';
 import { showcaseFiles, SHOWCASE_MAPPING } from '../core/showcase.js';
 import { EXAMPLE_FOLDER } from '../core/chardata.js';
@@ -58,7 +59,11 @@ export function startHelperMode() {
   const info = window.__DMF_SERVER__;
   if (!info) return false;
   set({ helper: true });
-  startVault(new HttpVault({ name: info.name, token: info.token }));
+  if (info.hosted) {
+    const v = new ServerVault({ name: info.name, token: info.token });
+    startRemote(v);
+    startVault(v);
+  } else startVault(new HttpVault({ name: info.name, token: info.token }));
   resumeLastCampaign();
   return true;
 }
@@ -206,6 +211,7 @@ export function undoCombat() {
 export async function chooseCampaign(path) {
   set({ screen: 'loading', loadMsg: 'Reading notes…' });
   try {
+    await remoteBeforeLoad();
     const loaded = await loadCampaign(S.vault, path, (d, t) => { S.loadMsg = 'Reading notes… ' + d + ' of ' + t; emit(); });
     const campaign = { path, name: basename(path) || S.vault.name };
     const working = new Working();
@@ -252,6 +258,7 @@ export async function reloadCampaign() {
   const path = S.campaign.path;
   set({ screen: 'loading', loadMsg: 'Reloading from the vault…' });
   try {
+    await remoteBeforeLoad();
     const loaded = await loadCampaign(S.vault, path, (d, t) => { S.loadMsg = 'Reading notes… ' + d + ' of ' + t; emit(); });
     const working = new Working();
     working.onChange = trackChange;
@@ -533,6 +540,10 @@ export function logCombatToSession(sessionPath) {
 /* ---------- push ---------- */
 export async function startPush() {
   if (!S.working.count) return;
+  if (S.hosted && S.vault.ping) {
+    try { await S.vault.ping(); }
+    catch (e) { toast(S.working.count + ' change' + (S.working.count === 1 ? ' is' : 's are') + ' saved on this device. ' + (e && e.auth ? errMsg(e) : 'The server cannot be reached right now: push once it is back (this page checks for you).'), true); return; }
+  }
   try {
     const ok = await S.vault.ensureWrite();
     if (!ok) { toast('Write permission for the folder was not granted.', true); return; }

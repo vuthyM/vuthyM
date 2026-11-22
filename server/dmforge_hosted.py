@@ -201,6 +201,8 @@ class Handler(BaseHTTPRequestHandler):
         try:
             if parsed.path == '/' and self.command in ('GET', 'HEAD'):
                 return self._serve_app()
+            if parsed.path == '/sw.js' and self.command in ('GET', 'HEAD'):
+                return self._serve_worker()
             if parsed.path == '/login' and self.command == 'POST':
                 return self._login()
             if parsed.path == '/logout' and self.command == 'POST':
@@ -246,7 +248,18 @@ class Handler(BaseHTTPRequestHandler):
         info = json.dumps({'name': State.name, 'token': '', 'hosted': True})
         inject = '<script>window.__DMF_SERVER__=%s;</script>' % info.replace('<', '\\u003c')
         html = html.replace('<!--DMF_SERVER-->', inject, 1)
-        self._send(200, html, 'text/html; charset=utf-8')
+        self._send(200, html, 'text/html; charset=utf-8', {'X-DMF-App': '1'})
+
+    def _serve_worker(self):
+        try:
+            with open(os.path.join(HERE, 'sw.js'), 'rb') as f:
+                body = f.read()
+        except OSError:
+            return self._json(404, {'error': 'Not found'})
+        self._send(200, body, 'text/javascript; charset=utf-8', {'Service-Worker-Allowed': '/'})
+
+    def _secure(self):
+        return (self.headers.get('X-Forwarded-Proto') or '').lower() == 'https'
 
     def _login(self):
         if self._locked_out():
@@ -257,7 +270,7 @@ class Handler(BaseHTTPRequestHandler):
             self._note_fail()
             return self._send(401, LOGIN.replace('%ERR%', '<p class="err">That token is not right.</p>'), 'text/html; charset=utf-8')
         self._clear_fails()
-        cookie = '%s=%s; Path=/; Max-Age=31536000; HttpOnly; SameSite=Strict' % (COOKIE, State.session)
+        cookie = '%s=%s; Path=/; Max-Age=31536000; HttpOnly; SameSite=Strict%s' % (COOKIE, State.session, '; Secure' if self._secure() else '')
         return self._send(303, b'', 'text/plain', {'Location': '/', 'Set-Cookie': cookie})
 
     # ---- API ----

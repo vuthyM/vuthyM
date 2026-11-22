@@ -1,0 +1,10 @@
+node_modules
+dist
+test
+helper
+tools
+*.zip
+.git
+data
+export
+.env

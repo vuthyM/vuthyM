@@ -373,6 +373,36 @@ class HttpTests(unittest.TestCase):
         st, j, _ = self.js('GET', '/api/search?q=one')
         self.assertIn('U/a.md', [r['path'] for r in j])
 
+    def test_host_allow_list(self):
+        H.State.hosts = ('dm.tail1234.ts.net',)
+        try:
+            c = http.client.HTTPConnection('127.0.0.1', self.port, timeout=10)
+            c.request('GET', '/api/ping', headers={'Host': 'evil.example', 'X-DMF-Token': self.token})
+            self.assertEqual(c.getresponse().status, 403)
+            c.close()
+            c = http.client.HTTPConnection('127.0.0.1', self.port, timeout=10)
+            c.request('GET', '/api/ping', headers={'Host': 'dm.tail1234.ts.net', 'X-DMF-Token': self.token})
+            self.assertEqual(c.getresponse().status, 200)
+            c.close()
+            self.assertEqual(self.req('GET', '/healthz', token=False)[0], 200)  # the Docker health check needs no Host
+        finally:
+            H.State.hosts = ()
+
+    def test_service_worker_and_app_header(self):
+        st, body, hd = self.req('GET', '/sw.js', token=False)
+        self.assertEqual(st, 200)
+        self.assertIn('javascript', hd['content-type'])
+        self.assertEqual(hd['service-worker-allowed'], '/')
+        self.assertIn(b'dmforge-shell', body)
+        H.State.fails.clear()
+        st, body, hd = self.req('POST', '/login', body=('token=' + self.token).encode(), headers={'Content-Type': 'application/x-www-form-urlencoded', 'X-Forwarded-Proto': 'https'}, token=False)
+        cookie = hd['set-cookie']
+        self.assertIn('Secure', cookie)  # behind Tailscale HTTPS the cookie is marked Secure
+        st, body, hd = self.req('GET', '/', headers={'Cookie': cookie.split(';')[0]}, token=False)
+        self.assertEqual(hd.get('x-dmf-app'), '1')
+        st, body, hd = self.req('GET', '/', token=False)
+        self.assertNotIn('x-dmf-app', hd)  # the sign-in page is never kept by the worker
+
     def test_backup_endpoint(self):
         st, j, _ = self.js('POST', '/api/backup')
         self.assertEqual(st, 200)

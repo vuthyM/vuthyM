@@ -1722,3 +1722,9 @@ input.sw:focus-visible,.seg-in:focus-visible+span{outline:2px solid var(--accent
 .session-page .note-head.sp-head h2{font-size:32px}
 .split.reader>div,.split.reader.has-sel>div:first-child,[data-wide="0"] .split.reader.has-sel>div:first-child{display:block}
 @media (max-width:700px){.topbar{padding-left:12px;padding-right:12px;gap:6px}.search-wrap{min-width:90px}.tb-push{font-size:13px}}
+
+/* V3: the server cannot be reached */
+.tb-offline{display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border-radius:999px;font-size:13px;font-weight:600;white-space:nowrap;color:var(--fg);background:color-mix(in srgb,var(--warn,#c98a1a) 18%,var(--surface));border:1px solid color-mix(in srgb,var(--warn,#c98a1a) 45%,var(--border))}
+.tb-offline::before{content:'';width:8px;height:8px;border-radius:50%;background:var(--warn,#c98a1a)}
+.tb-offline-note{font-weight:400;color:var(--fg-soft)}
+@media (max-width:900px){.tb-offline-note{display:none}}

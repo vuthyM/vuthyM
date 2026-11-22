@@ -7,6 +7,16 @@ export const KINDS = { new: 'New', improved: 'Improved', fixed: 'Fixed' };
 
 export const CHANGELOG = [
   {
+    version: '2.53.0', date: '2026-11-22', title: 'V3 preview: run DM Forge from your server',
+    changes: [
+      ['new', 'DM Forge can now be served from a small server on your own machine (a mini PC with Docker, reached over Tailscale) instead of from your Mac. The campaign lives in a database there, with every earlier version of every note kept, a nightly copy of the database and a nightly plain-Markdown copy of the whole campaign. See deploy/DEPLOY-V3.md. Folder mode and the Mac helper work exactly as before.'],
+      ['new', 'Work with no connection. Everything you open is saved on the device, so the app and the campaign open with the server down (use the HTTPS address). Your edits stay as unpushed changes, the top bar says Offline, and it says so by itself when the server is back.'],
+      ['new', 'Changes made on another device show up here without a reload (for notes you have not touched). A note you have unpushed changes on is never replaced: the push review flags it, as before.'],
+      ['new', 'The server refuses to overwrite a note that changed since the version you started from, whatever the timing. Your change stays waiting and nothing is lost.'],
+      ['improved', 'Settings no longer offers helper-only update and roll-back buttons when you are on the server; they explain how the server is updated instead.'],
+    ],
+  },
+  {
     version: '2.52.0', date: '2026-11-19', title: 'A calmer top bar and a session page that puts the note first',
     changes: [
       ['new', 'The session page has three modes, Prep, Run and Wrap up, and shows only the buttons for the one you are in. Prep: Import last session, the cast, the prep check and prepared encounters. Run: Go live, Run combat and the Live panel. Wrap up: Tidy notes and Close out (the main button). The mode picks itself (a session you have not played is Prep, going Live, a fight or the running timer is Run, a session with a log is Wrap up) and you can switch it with the tabs under the title; your choice is remembered for that session.'],

@@ -19,7 +19,7 @@ const settle = () => sleep(3400);          // the theme fades over about three s
 check('Tide is the default: the attribute is set', (await pg.evaluate(() => document.documentElement.dataset.palette)) === 'tide');
 await settle();
 let c = await rgb();
-check('on a dark Mac the page is deep navy, not brown', c.page === 'rgb(17, 27, 44)', c.page);
+check('on a dark Mac the page is deep navy, not brown', c.page === 'rgb(11, 21, 40)', c.page);
 check('the accent is the soft rust', c.accent === 'rgb(232, 148, 106)', c.accent);
 
 // the settings page lists the themes, and choosing one applies at once and is remembered
@@ -48,13 +48,13 @@ c = await rgb();
 check('light Fig is cream with plum ink, still a Fig', c.page === 'rgb(245, 237, 230)' && c.fg === 'rgb(50, 23, 39)' && c.accent === 'rgb(139, 52, 82)', JSON.stringify(c));
 await pg.evaluate(() => window.__dmforge.A.updateSetting('palette', 'tide')); await settle();
 c = await rgb();
-check('light Tide is warm cream with navy ink and rust', c.page === 'rgb(242, 236, 223)' && c.fg === 'rgb(23, 36, 59)' && c.accent === 'rgb(166, 77, 31)', JSON.stringify(c));
+check('light Tide is warm cream with navy ink and rust', c.page === 'rgb(242, 236, 223)' && c.fg === 'rgb(18, 32, 57)' && c.accent === 'rgb(166, 77, 31)', JSON.stringify(c));
 
 // a campaign's own accent still wins over the theme's
 await pg.evaluate(() => window.__dmforge.A.setTheme('dark')); await settle();
 await pg.evaluate(() => window.__dmforge.A.setAccent('frost')); await settle();
 c = await rgb();
-check('a campaign accent (Frost) overrides the theme accent in dark', c.accent === 'rgb(98, 175, 229)' && c.page === 'rgb(17, 27, 44)', JSON.stringify(c));
+check('a campaign accent (Frost) overrides the theme accent in dark', c.accent === 'rgb(98, 175, 229)' && c.page === 'rgb(11, 21, 40)', JSON.stringify(c));
 await pg.evaluate(() => window.__dmforge.A.setTheme('light')); await settle();
 check('and in light', (await rgb()).accent === 'rgb(38, 111, 162)');
 await pg.evaluate(() => window.__dmforge.A.setAccent('gold')); await pg.evaluate(() => window.__dmforge.A.setTheme('dark')); await settle();

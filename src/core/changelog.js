@@ -7,6 +7,12 @@ export const KINDS = { new: 'New', improved: 'Improved', fixed: 'Fixed' };
 
 export const CHANGELOG = [
   {
+    version: '2.57.1', date: '2026-11-22', title: 'Tide: a deeper blue',
+    changes: [
+      ['improved', 'Tide is a little deeper: the dark navy is darker and richer (background, cards, raised areas and borders), and the light theme\'s navy ink is a touch deeper too. The cream text and the rust accent are unchanged, and every text colour is still checked for readability.'],
+    ],
+  },
+  {
     version: '2.57.0', date: '2026-11-22', title: 'New colours: Tide, Fig and Olive',
     changes: [
       ['new', 'A new colour system with three themes, chosen in Settings, Appearance, Colour theme. Tide is the default: deep navy with cream and a soft rust accent. Fig is plum with cream and dusty rose. Olive is deep olive with cream and a leaf-green accent. Each has a dark and a matching light version that follow Auto, Light and Dark as before. Classic (the original brown and gold) is still there to switch back to.'],

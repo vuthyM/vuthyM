@@ -22,3 +22,5 @@ function run(mode, fn) {
 export async function idbGet(k) { try { return await run('readonly', s => s.get(k)); } catch (e) { return undefined; } }
 export async function idbSet(k, v) { try { await run('readwrite', s => s.put(v, k)); return true; } catch (e) { return false; } }
 export async function idbDel(k) { try { await run('readwrite', s => s.delete(k)); return true; } catch (e) { return false; } }
+/* every key (used to move settings to another browser) */
+export async function idbKeys() { try { return await run('readonly', s => s.getAllKeys()); } catch (e) { return []; } }

@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'preact/hooks';
 import { GROUP_AFTER_CHOICES } from '../core/grouping.js';
 import { S, set, toast, useApp } from './store.js';
-import { updateSetting, clearLeftOff, hiddenGens, setGenVisible, setGensVisible, setAccent, setTheme, setLayout, LAYOUTS, askUndoPush, checkForUpdate, setSettingsCat } from './actions.js';
+import { updateSetting, clearLeftOff, hiddenGens, setGenVisible, setGensVisible, setAccent, setTheme, setLayout, LAYOUTS, askUndoPush, checkForUpdate, setSettingsCat, exportSettings, askImportSettings } from './actions.js';
 import { GROUPS } from '../core/genlayout.js';
 import { GENS_BY_ID } from '../core/generators.js';
 import { parseDelay, delayText, MAX_DELAY } from '../core/shortcuts.js';
@@ -198,6 +198,11 @@ function useItems() {
   add('data', 'undopush', 'Undo last push', 'undo push restore notes helper', (
     <Row key="undopush" id="undopush" title="Undo last push" desc={S.helper ? (S.undo ? 'Put back the ' + S.undo.files + ' note' + (S.undo.files === 1 ? '' : 's') + ' your last push changed. The last 10 pushes are kept.' : 'Put back the notes your last push changed. The last 10 pushes are kept.') : 'Needs the helper (start DM Forge with Start DM Forge.command).'}>
       <button class="btn btn-sm" id="setUndoPush" disabled={!S.helper} onClick={() => askUndoPush()}>Undo last push…</button>
+    </Row>));
+  add('data', 'moveset', 'Move my settings', 'settings export import move transfer backup server new device theme fonts layout favourites', (
+    <Row key="moveset" id="moveset" title="Move my settings" desc="Save your theme, fonts, layout, favourites, list views and where you left off to a file, and bring them in on another device or after moving to the server. Notes are not part of it.">
+      <button class="btn btn-sm" id="setExport" onClick={() => exportSettings()}>Save my settings…</button>
+      <label class="btn btn-sm" id="setImportLabel" style="cursor:pointer">Bring my settings in…<input type="file" id="setImportFile" accept="application/json,.json" style="display:none" onChange={e => { const f = e.currentTarget.files && e.currentTarget.files[0]; e.currentTarget.value = ''; askImportSettings(f); }} /></label>
     </Row>));
   add('data', 'trash', 'Trash', 'deleted notes restore recover', (
     <Row key="trash" id="trash" title="Trash" desc="Notes you deleted: see them and put one back.">

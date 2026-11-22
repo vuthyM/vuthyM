@@ -3634,3 +3634,38 @@ test('appears in: the field writes as a list of links, like Seeded by', () => {
   assert.equal(def.kind, 'links');
   assert.match(wf49('---\nstatus: Active\n---\n# T\n', def, ['Greenhold', 'The Weir']), /appears:\n  - "\[\[Greenhold\]\]"\n  - "\[\[The Weir\]\]"\n---/);
 });
+
+/* ---- moving settings to another browser ---- */
+import { buildBundle, parseBundle, planImport, belongsTo, swapVault } from '../src/core/settingsbundle.js';
+test('settings bundle: takes settings, leaves moments and other vaults, and follows you to a new vault', () => {
+  const local = {
+    'dmforge:settings': '{"fontSet":"x"}', 'dmforge:theme': 'dark',
+    'dmforge:favs:http:Old Vault|Ashfall': '["sec:npc"]', 'dmforge:layout|http:Old Vault|Ashfall': 'split',
+    'dmforge:last-campaign:http:Old Vault': 'Ashfall', 'dmforge:view:http:Old Vault|Ashfall|plot': '{"sort":"name"}',
+    'dmforge:favs:fsa:Other|Ashfall': '["other"]', 'dmforge:combat:http:Old Vault|Ashfall': '{"round":3}',
+    'dmforge:timer:http:Old Vault|Ashfall': '{}', 'dmforge:device': 'abc', 'dmforge:seq:Old Vault': '5', 'unrelated': 'x',
+  };
+  const b = buildBundle({ local, idb: { 'mapping|http:Old Vault|Ashfall': { NPCs: 'npc' }, 'mapping|fsa:Other|Ashfall': {}, 'pending|http:Old Vault|Ashfall': [1] }, vaultKey: 'http:Old Vault', version: '2.53.0' });
+  assert.deepEqual(Object.keys(b.local).sort(), ['dmforge:favs:http:Old Vault|Ashfall', 'dmforge:last-campaign:http:Old Vault', 'dmforge:layout|http:Old Vault|Ashfall', 'dmforge:settings', 'dmforge:theme', 'dmforge:view:http:Old Vault|Ashfall|plot']);
+  assert.deepEqual(Object.keys(b.idb), ['mapping|http:Old Vault|Ashfall']);
+  const back = parseBundle(JSON.stringify(b));
+  assert.ok(back.bundle);
+  const plan = planImport(back.bundle, 'http:My Campaigns');
+  assert.equal(plan.local['dmforge:favs:http:My Campaigns|Ashfall'], '["sec:npc"]');
+  assert.equal(plan.local['dmforge:last-campaign:http:My Campaigns'], 'Ashfall');
+  assert.equal(plan.local['dmforge:layout|http:My Campaigns|Ashfall'], 'split');
+  assert.equal(plan.local['dmforge:settings'], '{"fontSet":"x"}');
+  assert.deepEqual(plan.idb, { 'mapping|http:My Campaigns|Ashfall': { NPCs: 'npc' } });
+  assert.ok(!Object.keys(plan.local).some(k => k.includes('Old Vault')));
+});
+test('settings bundle: a vault key only matches whole, never part of another name', () => {
+  assert.equal(belongsTo('dmforge:favs:http:Vault|X', 'http:Vault'), true);
+  assert.equal(belongsTo('dmforge:favs:http:Vault 2|X', 'http:Vault'), false);
+  assert.equal(belongsTo('dmforge:favs:http:Big Vault|X', 'http:Vault'), false);
+  assert.equal(swapVault('dmforge:last-campaign:http:Vault', 'http:Vault', 'http:New'), 'dmforge:last-campaign:http:New');
+});
+test('settings bundle: rejects files that are not settings', () => {
+  assert.ok(parseBundle('not json').error);
+  assert.ok(parseBundle('{"app":"other"}').error);
+  assert.ok(parseBundle(JSON.stringify({ app: 'dmforge-settings', format: 2, local: {} })).error);
+});

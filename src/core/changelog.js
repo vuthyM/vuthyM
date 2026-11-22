@@ -7,6 +7,12 @@ export const KINDS = { new: 'New', improved: 'Improved', fixed: 'Fixed' };
 
 export const CHANGELOG = [
   {
+    version: '2.53.1', date: '2026-11-22', title: 'Move your settings to another device or to the server',
+    changes: [
+      ['new', 'Settings, Data: "Save my settings…" writes your theme, fonts, layout, favourites, list views, folder-to-type guesses and where you left off to one small file, and "Bring my settings in…" reads it on another device, browser or server. Settings that belong to one vault and campaign follow you to the new vault name. Notes, unpushed changes, a fight in progress and the timer are not part of it.'],
+    ],
+  },
+  {
     version: '2.53.0', date: '2026-11-22', title: 'V3 preview: run DM Forge from your server',
     changes: [
       ['new', 'DM Forge can now be served from a small server on your own machine (a mini PC with Docker, reached over Tailscale) instead of from your Mac. The campaign lives in a database there, with every earlier version of every note kept, a nightly copy of the database and a nightly plain-Markdown copy of the whole campaign. See deploy/DEPLOY-V3.md. Folder mode and the Mac helper work exactly as before.'],

@@ -8,7 +8,8 @@ import { asExample } from '../core/library.js';
 import { loadCampaign, topFolders, newNotePath, topFolderOf, folderFor, suggestSessionNumber, sessionWord } from '../core/campaign.js';
 import { detectMapping, OTHER, TYPES, isCustom, customId, typeInfo, typeLabel, fieldDefs, getField, toStored } from '../core/schema.js';
 import { Working } from '../core/working.js';
-import { idbGet, idbSet } from '../core/idb.js';
+import { idbGet, idbSet, idbKeys } from '../core/idb.js';
+import { buildBundle, parseBundle, planImport } from '../core/settingsbundle.js';
 import { patchFrontmatter, applyBody, splitFrontmatter, setFrontmatterRaw } from '../core/frontmatter.js';
 import { appendToSection, upsertBlock } from '../core/markdown.js';
 import { buildNoteText, defaultBody, CAMPAIGN_FOLDERS, campaignIndexText } from '../core/templates.js';
@@ -910,6 +911,41 @@ export function setClaudeOn(on) {
   emit();
 }
 export function askClaude(d) { set({ dialog: Object.assign({ kind: 'claude' }, d) }); }
+
+/* ---------- moving settings to another browser (or to the server) ---------- */
+export async function exportSettings() {
+  const local = {};
+  try { for (let i = 0; i < localStorage.length; i++) { const k = localStorage.key(i); if (k && k.startsWith('dmforge:')) local[k] = localStorage.getItem(k); } } catch (e) { /* storage unavailable */ }
+  const idb = {};
+  for (const k of await idbKeys()) if (typeof k === 'string' && k.startsWith('mapping|')) idb[k] = await idbGet(k);
+  const b = buildBundle({ local, idb, vaultKey: S.vaultKey, version: __DMF_VERSION__ });
+  const n = Object.keys(b.local).length + Object.keys(b.idb).length;
+  const blob = new Blob([JSON.stringify(b, null, 1)], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'dmforge-settings-' + today() + '.json';
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+  toast('Saved ' + n + ' settings to ' + a.download + '. Open DM Forge where you want them and use “Bring my settings in”.');
+}
+export async function askImportSettings(file) {
+  if (!file) return;
+  let parsed;
+  try { parsed = parseBundle(await file.text()); } catch (e) { toast('Could not read that file.', true); return; }
+  if (parsed.error) { toast(parsed.error, true); return; }
+  const b = parsed.bundle;
+  const n = Object.keys(b.local).length + Object.keys(b.idb || {}).length;
+  set({ dialog: { kind: 'confirm', title: 'Bring in ' + n + ' settings?', confirmLabel: 'Bring them in and reload',
+    body: 'This replaces the settings on this device with the ones in the file (theme, fonts, layout, favourites, list views, where you left off). Your notes and any unpushed changes are not touched. DM Forge reloads when it is done.',
+    onConfirm: () => applyImportedSettings(b) } });
+}
+async function applyImportedSettings(b) {
+  const plan = planImport(b, S.vaultKey);
+  try { for (const [k, v] of Object.entries(plan.local)) localStorage.setItem(k, v); } catch (e) { toast('This browser would not store the settings.', true); return; }
+  for (const [k, v] of Object.entries(plan.idb)) await idbSet(k, v);
+  flushPending();
+  location.reload();
+}
 
 /* ---------- settings ---------- */
 const SETTINGS_KEY = 'dmforge:settings';

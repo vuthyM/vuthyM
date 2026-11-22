@@ -26,7 +26,7 @@ check('seven categories down the left', await pg.locator('.set-cat').count() ===
 check('it starts on Appearance', (await pg.getAttribute('[data-setcat="appearance"]', 'aria-current')) === 'page');
 
 /* ---- one category at a time */
-const cats = { appearance: ['theme', 'darkstyle', 'accent', 'fontset'], layout: ['layout', 'sidebar'], writing: ['leave', 'autoopen'], sessions: ['track', 'neglect'], library: ['srd', 'groupafter', 'gens'], claude: ['claude', 'snapshot'], data: ['undopush', 'trash', 'update', 'version'] };
+const cats = { appearance: ['theme', 'darkstyle', 'accent', 'fontset'], layout: ['layout', 'sidebar'], writing: ['leave', 'autoopen'], sessions: ['track', 'neglect'], library: ['srd', 'groupafter', 'gens'], claude: ['claude', 'snapshot'], data: ['undopush', 'moveset', 'trash', 'update', 'version'] };
 for (const [c, ids] of Object.entries(cats)) {
   await pg.click('[data-setcat="' + c + '"]');
   const got = await shown();

@@ -58,6 +58,12 @@ Then put that name in `.env` as `DMFORGE_HOSTS` and run `docker compose up -d` s
 
 **Do not use `tailscale funnel`.** Funnel puts a service on the public internet. This guide never does.
 
+## 5a. Bring your settings over (optional, from version 2.53.1)
+
+Your theme, fonts, layout, favourites and so on live in the browser you used before, so the server's address starts with defaults.
+In the **old** place (the Mac helper or folder mode, once it is updated to 2.53.1): **Settings, Data, Save my settings…**. In the **new** place,
+after you have opened the campaign once: **Settings, Data, Bring my settings in…**, pick that file and confirm. DM Forge reloads with your settings.
+
 ## 5. Bring your campaign in (once)
 
 Dry run first. It changes nothing and tells you what it would do (the vault folder is mounted read-only):

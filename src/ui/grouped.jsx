@@ -127,9 +127,9 @@ export function UnplacedNudge() {
   if (!n || n === npcs.length && npcs.length < 4) return null;
   const sug = suggestPlaces(idx, npcs).size;
   return (
-    <div class="card" id="unplacedNudge" style="margin-bottom:16px;display:flex;gap:12px;align-items:center;flex-wrap:wrap">
-      <div style="flex:1;min-width:220px"><b>{n} NPC{n === 1 ? ' is' : 's are'} not in a place yet.</b><div class="small muted">{sug ? sug + ' of them mention a place in their notes, so DM Forge can suggest where.' : 'Put each one in a place and the NPC list can fold them up by town.'}</div></div>
-      <button class="btn" id="unplacedGo" onClick={() => showUnplaced('npc')}>Sort them into places</button>
+    <div class="tidy-row" id="unplacedNudge">
+      <div class="tidy-text"><b>{n} NPC{n === 1 ? ' is' : 's are'} not in a place yet.</b><div class="small muted">{sug ? sug + ' of them mention a place in their notes, so DM Forge can suggest where.' : 'Put each one in a place and the NPC list can fold them up by town.'}</div></div>
+      <button class="btn btn-sm" id="unplacedGo" onClick={() => showUnplaced('npc')}>Sort them into places</button>
     </div>
   );
 }

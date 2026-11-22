@@ -1751,3 +1751,16 @@ input.sw:focus-visible,.seg-in:focus-visible+span{outline:2px solid var(--accent
 .c-toggle[aria-expanded=true] svg{transform:rotate(180deg)}
 .c-listbar{display:flex;justify-content:flex-end;margin:0 0 4px}
 .c-name .mini.roll{width:26px;height:22px;display:inline-grid;place-items:center;border-radius:6px;padding:0}
+
+/* ---------- overview, round two: one quiet block for the little things that need doing ---------- */
+.overview-head .row-actions{align-items:center;gap:8px}
+.btn-icon{padding:8px 10px;display:inline-grid;place-items:center}
+.pop-item .pop-hint{display:block;font-size:12px;color:var(--fg-soft);font-weight:400;margin-top:2px;white-space:normal;max-width:240px}
+.tidyups{margin-bottom:16px;border:1px solid var(--border);border-radius:12px;background:var(--surface);overflow:hidden}
+.tidyups:empty{display:none}
+.tidyups>.unpushed-bar,.tidyups>.tidy-row{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin:0;border:0;border-radius:0;background:transparent;color:var(--fg);padding:10px 14px;font-size:14px}
+.tidyups>.unpushed-bar+.tidy-row,.tidyups>.tidy-row+.unpushed-bar{border-top:1px solid var(--border)}
+.tidyups .unpushed-bar{background:color-mix(in srgb,var(--warn) 9%,var(--surface))}
+.tidyups .tidy-text{flex:1;min-width:220px}
+.tidyups .tidy-text .small{margin-top:1px}
+.drop-hint{padding:6px 10px;margin:2px 6px 4px;font-size:12.5px;text-align:left}

@@ -733,20 +733,33 @@ export function Overview() {
           <div class="muted" id="overviewSub">{sub}</div>
         </div>
         <div class="row-actions">
-          {latest && <ImportLastButton path={latest.path} />}
-          {latest && !running && <button class="btn btn-sm" id="overviewTimer" onClick={() => timerToggle()}><Icon name="timer" size={15} />Start timer</button>}
-          {latest && <button class={'btn' + (played ? '' : ' btn-primary')} id="overviewOpen" onClick={() => goto(latest.path)}>Open session</button>}
-          <button class={'btn' + (latest && !played ? '' : ' btn-primary')} id="overviewNew" onClick={() => set({ dialog: { kind: 'newSession' } })}>+ New session</button>
+          {/* one main button for what comes next; the rest are in the ... menu */}
+          {latest && !played && <button class="btn btn-primary" id="overviewOpen" onClick={() => goto(latest.path)}>Open session</button>}
+          {(!latest || played) && <button class="btn btn-primary" id="overviewNew" onClick={() => set({ dialog: { kind: 'newSession' } })}>+ New session</button>}
+          {latest && (
+            <PopMenu id="overviewMore" title="More: new session, import last session, timer" align="right" btnClass="btn btn-icon">
+              {({ close }) => (
+                <>
+                  {played && <button class="pop-item" id="overviewOpen" role="menuitem" onClick={() => { close(); goto(latest.path); }}>Open session</button>}
+                  {!played && <button class="pop-item" id="overviewNew" role="menuitem" onClick={() => { close(); set({ dialog: { kind: 'newSession' } }); }}>+ New session</button>}
+                  <ImportLastButton path={latest.path} item close={close} />
+                  {!running && <button class="pop-item" id="overviewTimer" role="menuitem" onClick={() => { close(); timerToggle(); }}><Icon name="timer" size={16} />Start timer</button>}
+                </>
+              )}
+            </PopMenu>
+          )}
         </div>
       </div>
       <StartCard />
+      <div class="tidyups">
       {pend.length > 0 && (
-        <div class="unpushed-bar" style="margin-bottom:20px">
+        <div class="unpushed-bar">
           <span>{pend.length} unpushed change{pend.length === 1 ? '' : 's'}: {pend.filter(p => p.kind === 'create' && !p.movedFrom).length} new, {pend.filter(p => p.kind === 'update').length} edited, {pend.filter(p => p.movedFrom).length} moved, {pend.filter(p => p.kind === 'delete').length} deleted.</span>
           <button class="btn btn-sm btn-primary" onClick={startPush}>Review and push</button>
         </div>
       )}
       <UnplacedNudge />
+      </div>
       <ForgettingCard />
       <div class="ov-grid">
         <div class="card">
@@ -845,7 +858,7 @@ function StartCard() {
 }
 
 /* "Import last session": the previous session's recap, carry-over tasks and hidden secrets, at the top of this one's prep */
-function ImportLastButton({ path }) {
+function ImportLastButton({ path, item, close }) {
   useApp();
   const info = lastSessionInfo(path);
   const none = !info.prev ? 'There is no earlier session.' : info.data.empty ? info.prev.name + ' has nothing to bring in yet: close it out first.' : '';
@@ -853,5 +866,7 @@ function ImportLastButton({ path }) {
     const r = importLastSession(path);
     toast(r.ok ? 'Brought in ' + r.parts + ' from ' + r.from + '. Push changes to save it.' : r.error, !r.ok);
   };
-  return <button class="btn btn-sm" id="importLastBtn" disabled={!!none} title={none || 'Bring in ' + info.parts + ' from ' + info.prev.name + ', under “Last time” before the prep'} onClick={go}>Import last session</button>;
+  const title = none || 'Bring in ' + info.parts + ' from ' + info.prev.name + ', under “Last time” before the prep';
+  if (item) return <button class="pop-item" id="importLastBtn" role="menuitem" disabled={!!none} title={title} onClick={() => { if (close) close(); go(); }}>Import last session{none ? <span class="pop-hint">{none}</span> : null}</button>;
+  return <button class="btn btn-sm" id="importLastBtn" disabled={!!none} title={title} onClick={go}>Import last session</button>;
 }

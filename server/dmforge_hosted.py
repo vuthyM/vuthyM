@@ -38,6 +38,7 @@ import dmforge_io  # noqa: E402
 
 MAX_WRITE = 20 * 1024 * 1024
 COOKIE = 'dmf_session'
+LOOPBACK_HOSTS = ('127.0.0.1', 'localhost', '[::1]')
 mimetypes.add_type('image/svg+xml', '.svg')
 mimetypes.add_type('image/webp', '.webp')
 mimetypes.add_type('text/markdown; charset=utf-8', '.md')
@@ -143,7 +144,9 @@ class Handler(BaseHTTPRequestHandler):
         host = (self.headers.get('Host') or '').lower()
         if State.hosts:
             name = host.rsplit(':', 1)[0] if not host.startswith('[') else host.split(']')[0] + ']'
-            if name not in State.hosts:
+            # the machine talking to itself (health checks, the updater, docker exec) is always fine: a browser attacked over the
+            # network always sends the attacker's own host name, never these
+            if name not in State.hosts and name not in LOOPBACK_HOSTS:
                 return False
         origin = self.headers.get('Origin')
         if origin:

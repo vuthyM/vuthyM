@@ -7,6 +7,33 @@ export const KINDS = { new: 'New', improved: 'Improved', fixed: 'Fixed' };
 
 export const CHANGELOG = [
   {
+    version: '2.60.0', date: '2026-11-23', title: 'The Server page, and a copy you can take away',
+    changes: [
+      ['new', 'Settings, Server (V3): the server\'s own report in one place. The last nightly backup (when, how big, and whether it was checked), the last update and when the server last looked for one, free disk space, the size of the database, how many notes and pictures there are. If something needs a look (a failed backup, no backup for a day and a half, low disk space, an update that did not install, the server not looking for updates), the top bar says "Server needs a look" and the page says what.'],
+      ['new', 'Download a backup from the app: every note and picture as a .zip of ordinary files (open it in Obsidian), or the database itself (every earlier version of every note). tools/pull-backup.sh does the same from your Mac every day over Tailscale and keeps the newest 14, so the campaign is never only on the server\'s disk. Steps are in deploy/DEPLOY-V3.md.'],
+      ['new', 'Hold updates (Settings, Server): stops the server installing a new version for 8 hours, then starts again by itself. Use it before a session so nothing restarts under you.'],
+      ['new', 'Push for me when I stop (Settings, Writing and saving; off to begin with): after 5, 10, 20 or 30 quiet minutes with no editor holding unsaved text and no dialog open, your unpushed changes go to the server as one push that Undo last push can take back. It never does this when a note changed on the server since you started editing it, when two edits had to be merged, or when a note would be deleted: those wait for you and the review, and it tells you so.'],
+      ['new', 'Work with no connection: Settings, Server shows how many notes and pictures this device holds, and "Save everything for offline" fetches the rest (pictures were only saved once you had looked at them).'],
+      ['improved', 'An open page is offered "Reload to use it" within about 30 seconds of the server being updated (it never reloads for you). Before, only the Mac helper did this.'],
+      ['improved', 'Opening the campaign downloads only the notes that changed since this device last had them, instead of every note every time.'],
+      ['improved', 'Nightly database copies are checked (SQLite\'s own check, and every note and picture counted) before they are kept, compressed (about a tenth of the size for text), and a bad one is reported instead of kept. The copy taken before each update is compressed too, and the last 10 are kept instead of 20.'],
+      ['fixed', 'A picture imported from DMAtlas was stored twice in the database (the file and a history copy), doubling its size in every backup. It is now kept once; on start the server drops the old history copies (the pictures themselves are untouched).'],
+    ],
+  },
+  {
+    version: '2.59.0', date: '2026-11-23', title: 'A sturdier server',
+    changes: [
+      ['fixed', 'You could be locked out of your own server. Six wrong tokens (from any device: behind Tailscale they all look like one) made even the right token wait, and an open tab with an old cookie kept the lock going after a token change. Now the right token always works; only wrong tokens typed in count, and a request with no token or an old cookie never does.'],
+      ['fixed', 'If another process was using the database for more than a few seconds (an import run while the app was up, say), the failed request kept the store\'s lock and every later request waited forever while the health check still said healthy. The lock is now always let go, a commit that fails (a full disk) is rolled back instead of left open for later writes to join, and the health check really writes to the database so a stuck or unwritable server is restarted.'],
+      ['fixed', 'The change feed that tells your other devices what moved could, after a very large change, hand over only the first part but report everything as seen, so the rest never arrived. It now says there is more and the app keeps asking until it has all of it.'],
+      ['improved', 'The server drops a connection that goes quiet for 30 seconds, never reads the body of a request that has no valid token, and refuses oversized sign-in forms, so a stalled or hostile client cannot hold it up.'],
+      ['improved', 'A stalled or very slow server no longer leaves a blank page or a frozen app. The saved copy of the app opens after a few seconds, the app notices within a few seconds that the server is not answering and switches to Offline (using what is saved on this device), and it recovers by itself when the server answers again.'],
+      ['improved', 'The app page is sent compressed (1.7 MB instead of 3 MB) and is not sent again when it has not changed.'],
+      ['improved', 'The browser is asked to keep this site\'s saved data (the offline copy and unpushed changes) instead of clearing it when the disk is short.'],
+      ['improved', 'The server\'s sign-in page uses the Tide colours instead of the old brown and gold, and in dark mode follows the system. Docker\'s logs are now limited to 30 MB.'],
+    ],
+  },
+  {
     version: '2.58.2', date: '2026-11-23', title: 'DMAtlas that only accepts its own host name',
     changes: [
       ['fixed', 'If DMAtlas answers 421 (Misdirected Request) because it only accepts its own public host name, the importer now tries the names this server is known by (your tailnet name, with and without the port) and localhost by itself, remembers the one that works, and tells you which in the connection check. If none works it says to set DMFORGE_DMATLAS_HOST in .env.'],

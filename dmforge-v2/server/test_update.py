@@ -15,7 +15,7 @@ FAKE_DOCKER = r'''#!/usr/bin/env bash
 echo "$*" >> "$FAKE_DIR/calls.log"
 case "$1 $2" in
   "compose ps") [ "${FAKE_RUNNING:-1}" = "1" ] && echo dmforge; exit 0 ;;
-  "compose exec") [ -n "${FAKE_BACKUP_FAIL:-}" ] && exit 1; case "$*" in *"cat /app/VERSION"*) [ -n "${FAKE_CONTAINER_VERSION:-}" ] && echo "$FAKE_CONTAINER_VERSION";; esac; exit 0 ;;
+  "compose exec") [ -n "${FAKE_BACKUP_FAIL:-}" ] && exit 1; case "$*" in *backup_to*) f="$(echo "$*" | grep -o 'pre-update-[0-9-]*[.]db' | head -1)"; mkdir -p data/backups; echo "SQLite pretend" > "data/backups/$f";; esac; case "$*" in *"cat /app/VERSION"*) [ -n "${FAKE_CONTAINER_VERSION:-}" ] && echo "$FAKE_CONTAINER_VERSION";; esac; exit 0 ;;
   "compose build") [ -n "${FAKE_BUILD_FAIL:-}" ] && { echo "build exploded"; exit 1; }; exit 0 ;;
   "compose up") exit 0 ;;
   "image inspect") exit 0 ;;
@@ -191,6 +191,64 @@ class UpdateTests(unittest.TestCase):
         self.assertEqual(r.returncode, 0)
         self.assertEqual(self.log(), '')
         self.assertEqual(self.calls(), [])
+
+    def status_file(self):
+        import json
+        with open(os.path.join(self.app, 'data', 'update-status.json')) as f:
+            return json.load(f)
+
+    def test_the_outcome_is_written_where_the_app_can_show_it(self):
+        self.release('1.1.0')
+        self.run_update()
+        st = self.status_file()
+        self.assertEqual((st['state'], st['version']), ('ok', '1.1.0'))
+        self.assertTrue(st['at'] > 1e12)                                              # milliseconds, as the app expects
+        self.release('1.2.0')
+        self.run_update(FAKE_BUILD_FAIL=1)
+        st = self.status_file()
+        self.assertEqual((st['state'], st['version']), ('failed', '1.2.0'))
+        self.assertIn('did not build', st['message'])
+        self.release('1.3.0')
+        self.run_update(FAKE_BAD_VERSION='1.3.0')
+        st = self.status_file()
+        self.assertEqual((st['state'], st['version']), ('rolled-back', '1.3.0'))
+
+    def test_each_look_for_updates_is_noted_so_a_stopped_cron_job_shows(self):
+        self.run_update()
+        self.assertTrue(os.path.exists(os.path.join(self.app, 'data', '.update-checked')))
+
+    def test_a_hold_stops_the_install_and_ends_by_itself(self):
+        import time
+        self.release('1.1.0')
+        hold = os.path.join(self.app, 'data', '.hold-updates')
+        with open(hold, 'w') as f:
+            f.write(str(int(time.time()) + 3600))
+        r = self.run_update()
+        self.assertEqual(r.returncode, 0)
+        self.assertEqual(self.version(), '1.0.0')
+        self.assertEqual(self.calls(), [])
+        self.assertEqual(self.log(), '')                                              # quiet, like any other minute with nothing to do
+        self.assertIn('ON HOLD', self.run_update('--status').stdout)
+        with open(hold, 'w') as f:
+            f.write(str(int(time.time()) - 1))                                        # the hold has run out
+        self.run_update()
+        self.assertEqual(self.version(), '1.1.0')
+
+    def test_the_copy_taken_before_an_update_is_compressed_and_only_ten_are_kept(self):
+        import time
+        bdir = os.path.join(self.app, 'data', 'backups')
+        os.makedirs(bdir)
+        for i in range(14):
+            p = os.path.join(bdir, 'pre-update-2020010%02d-000000.db.gz' % i)
+            open(p, 'w').write('x')
+            os.utime(p, (1000 + i, 1000 + i))
+        self.release('1.1.0')
+        self.run_update()
+        names = sorted(os.listdir(bdir))
+        pre = [n for n in names if n.startswith('pre-update-')]
+        self.assertEqual(len(pre), 10)
+        self.assertTrue([n for n in pre if n.endswith('.db.gz') and '2020' not in n], pre)      # this update's copy, compressed
+        self.assertFalse([n for n in pre if n.endswith('.db')])
 
     def test_status(self):
         r = self.run_update('--status')

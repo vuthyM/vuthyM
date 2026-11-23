@@ -296,12 +296,14 @@ class Store:
                 raise StoreError(400, 'A folder with that name is already there')
             self._keep_for_push(push, path, 'write', row)
             version = self._next_version(path)
+            # a picture is kept once (in `files`): its history row records that it was written but does not hold a second copy of the bytes
+            keep = data if path.lower().endswith('.md') else None
             mtime = _now_ms()
             self.db.execute('INSERT INTO files (path, is_dir, content, mtime, version) VALUES (?, 0, ?, ?, ?) '
                             'ON CONFLICT(path) DO UPDATE SET content=excluded.content, mtime=excluded.mtime, version=excluded.version, is_dir=0',
                             (path, data, mtime, version))
             self.db.execute('INSERT INTO versions (path, version, content, mtime, action, push_id, device) VALUES (?, ?, ?, ?, ?, ?, ?)',
-                            (path, version, data, mtime, action, push or None, device or None))
+                            (path, version, keep, mtime, action, push or None, device or None))
             self._index(path, data)
             self._noted_wrote(push, path, data)
             return {'version': version, 'mtime': mtime, 'changed': True}
@@ -439,16 +441,21 @@ class Store:
 
     # ---- history, sync, search ----
     def changes(self, since=0, limit=5000):
-        """Which notes changed after sequence number `since`. -> {'seq': newest, 'changes': [{path, version, action}]}.
+        """Which notes changed after sequence number `since`. -> {'seq': number to ask from next time, 'changes': [...], 'more': bool}.
         A caller that stores `seq` and asks again later hears only about what moved. A note that was deleted shows
-        as action 'trash'."""
+        as action 'trash'. When more than `limit` notes moved, `seq` is the last change handed out and `more` is true:
+        ask again from that number until `more` is false, so nothing is skipped."""
         with self.lock:
-            seq = self.db.execute('SELECT COALESCE(MAX(seq), 0) AS s FROM versions').fetchone()['s']
+            newest = self.db.execute('SELECT COALESCE(MAX(seq), 0) AS s FROM versions').fetchone()['s']
             rows = self.db.execute(
-                'SELECT v.path, v.version, v.action, v.mtime FROM versions v '
+                'SELECT v.seq, v.path, v.version, v.action, v.mtime FROM versions v '
                 'JOIN (SELECT path, MAX(seq) AS m FROM versions WHERE seq > ? GROUP BY path) x ON x.m = v.seq '
-                'ORDER BY v.seq LIMIT ?', (int(since), int(limit))).fetchall()
-            return {'seq': seq, 'changes': [{'path': r['path'], 'version': r['version'], 'action': r['action'], 'mtime': r['mtime']} for r in rows]}
+                'ORDER BY v.seq LIMIT ?', (int(since), int(limit) + 1)).fetchall()
+            more = len(rows) > limit
+            rows = rows[:limit]
+            seq = rows[-1]['seq'] if more else newest
+            return {'seq': seq, 'more': more,
+                    'changes': [{'path': r['path'], 'version': r['version'], 'action': r['action'], 'mtime': r['mtime']} for r in rows]}
 
     def snapshot(self):
         """Every live note with its version, for a client that is starting from nothing: {path: version}."""
@@ -468,7 +475,7 @@ class Store:
         path = clean_path(rel)
         with self.lock:
             r = self.db.execute('SELECT content FROM versions WHERE path=? AND version=?', (path, int(version))).fetchone()
-            if r is None:
+            if r is None or (r['content'] is None and not path.lower().endswith('.md')):
                 raise StoreError(404, 'Not found')
             return bytes(r['content'] or b'')
 
@@ -500,10 +507,39 @@ class Store:
         try:
             with self.lock:
                 self.db.backup(out)
+            out.execute('PRAGMA journal_mode=DELETE')      # the copy is one self-contained file: no -wal or -shm companions to lose or leave behind
         finally:
             out.close()
         os.replace(tmp, dest)
         return dest
+
+    def health(self, wait=3.0):
+        """True when the database can be written to right now. Gives up after `wait` seconds instead of hanging (a stuck lock,
+        a full disk and a read-only file all show up as False)."""
+        if not self.lock.acquire(timeout=wait):
+            return False
+        try:
+            with self._tx():
+                self.db.execute("INSERT OR REPLACE INTO meta (key, value) VALUES ('heartbeat', ?)", (str(_now_ms()),))
+            return True
+        except Exception:
+            return False
+        finally:
+            self.lock.release()
+
+    def dedupe_image_versions(self):
+        """Pictures used to be kept twice (the file and a history copy). Drops the history copies: the picture itself stays in `files`,
+        and the database file itself shrinks the next time it is vacuumed or simply reuses the space. -> rows changed."""
+        with self._tx():
+            cur = self.db.execute("UPDATE versions SET content=NULL WHERE content IS NOT NULL AND lower(path) NOT LIKE '%.md'")
+            return cur.rowcount
+
+    def stats(self):
+        with self.lock:
+            md = self.db.execute("SELECT COUNT(*) AS c FROM files WHERE is_dir=0 AND lower(path) LIKE '%.md'").fetchone()['c']
+            other = self.db.execute("SELECT COUNT(*) AS c FROM files WHERE is_dir=0 AND lower(path) NOT LIKE '%.md'").fetchone()['c']
+            t = self.db.execute('SELECT COUNT(*) AS c FROM trash').fetchone()['c']
+            return {'notes': md, 'images': other, 'trashed': t}
 
     def counts(self):
         with self.lock:
@@ -513,25 +549,45 @@ class Store:
 
 
 class _Tx:
-    """BEGIN IMMEDIATE ... COMMIT, holding the store lock. Re-entrant: an inner use joins the outer transaction."""
+    """BEGIN IMMEDIATE ... COMMIT, holding the store lock. Re-entrant: an inner use joins the outer transaction.
+
+    Two things this must never do: keep the lock when BEGIN fails (another process holds the database), which
+    would park every later request for good; and leave a transaction open when COMMIT fails (a full disk), which
+    later writes would silently join and never save."""
     def __init__(self, store):
         self.s = store
         self.outer = False
 
     def __enter__(self):
         self.s.lock.acquire()
-        self.outer = not self.s.db.in_transaction
-        if self.outer:
-            self.s.db.execute('BEGIN IMMEDIATE')
+        try:
+            self.outer = not self.s.db.in_transaction
+            if self.outer:
+                self.s.db.execute('BEGIN IMMEDIATE')
+        except BaseException:
+            self.outer = False
+            self.s.lock.release()
+            raise
         return self
 
     def __exit__(self, et, ev, tb):
         try:
             if self.outer:
                 if et is None:
-                    self.s.db.execute('COMMIT')
+                    try:
+                        self.s.db.execute('COMMIT')
+                    except BaseException:
+                        self._rollback()
+                        raise
                 else:
-                    self.s.db.execute('ROLLBACK')
+                    self._rollback()
         finally:
             self.s.lock.release()
         return False
+
+    def _rollback(self):
+        try:
+            if self.s.db.in_transaction:
+                self.s.db.execute('ROLLBACK')
+        except Exception:
+            pass

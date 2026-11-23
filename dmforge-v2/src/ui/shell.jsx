@@ -1,7 +1,7 @@
 import { canBack, canForward, navStep } from './store.js';
 import { useEffect, useRef, useState } from 'preact/hooks';
 import { S, set, useApp, getIndex } from './store.js';
-import { setSection, goto, startPush, setLayout, tableMode, toggleCheat, setTheme, LAYOUTS, snapshotInfo, closeCampaign, reloadCampaign, discardAll, openTab, activateTab, wantsNewTab, claudeOn, openLayoutMenu, setDiceOpen, timerOpen, setLogOpen, checkForUpdate, askInstallUpdate, laterUpdate } from './actions.js';
+import { setSection, goto, startPush, setLayout, tableMode, toggleCheat, setTheme, LAYOUTS, snapshotInfo, closeCampaign, reloadCampaign, discardAll, openTab, activateTab, wantsNewTab, claudeOn, openLayoutMenu, setDiceOpen, timerOpen, setLogOpen, checkForUpdate, askInstallUpdate, laterUpdate, autoPushTick, refreshServerInfo, openSettings } from './actions.js';
 import { Sidebar } from './sidebar.jsx';
 import { describeSnapshot } from '../core/snapshot.js';
 import { PopMenu } from './popmenu.jsx';
@@ -170,6 +170,20 @@ function useNewVersionCheck() {
   }, []);
 }
 
+/* V3 only: pushes your edits for you once you have been quiet for a while (when you have turned that on), and keeps an eye on the server's own report */
+function useHostedWatch() {
+  useEffect(() => {
+    if (!S.hosted) return;
+    let stop = false;
+    const push = setInterval(() => { if (!stop && !document.hidden) autoPushTick(); }, 20000);
+    const look = () => { if (!stop && !document.hidden && S.online) refreshServerInfo(); };
+    const t = setInterval(look, 5 * 60000);
+    const first = setTimeout(look, 4000);
+    document.addEventListener('visibilitychange', look);
+    return () => { stop = true; clearInterval(push); clearInterval(t); clearTimeout(first); document.removeEventListener('visibilitychange', look); };
+  }, [S.hosted]);
+}
+
 /* the pinned bars on narrow screens (the page scrolls as a whole there) sit just under the top bar: its height is a CSS variable */
 function useChromeHeight() {
   useEffect(() => {
@@ -221,6 +235,7 @@ function useRenameKey() {
 export function Shell() {
   const s = useApp();
   useNewVersionCheck();
+  useHostedWatch();
   useChromeHeight();
   useRenameKey();
   useNavKeys();
@@ -261,6 +276,7 @@ export function Shell() {
           <SearchBox />
           <div class="spacer" />
           {s.hosted && !s.online && <span class="tb-offline" id="offlineChip" role="status" title="The server cannot be reached. You can keep working: everything is saved on this device, and pushing waits until it is back (this page checks for you).">Offline<span class="tb-offline-note"> · saved on this device</span></span>}
+          {s.hosted && s.online && s.serverWarn && <button class="tb-offline tb-warn" id="serverWarnChip" title={s.serverWarn + ' Click to see the server report.'} onClick={() => openSettings('server')}>Server needs a look</button>}
           <JobPill />
           <Island />
           <ViewMenu />

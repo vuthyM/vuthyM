@@ -26,6 +26,17 @@ export function startRemote(vault) {
   window.addEventListener('offline', () => { if (S.vault && S.vault.hosted) S.vault._setOnline(false); });
   setInterval(() => { if (!document.hidden && S.online) syncRemote(); }, 30000);
   registerWorker();
+  keepStorage();
+}
+
+/* ask the browser not to clear what this site has saved (the offline copy and unpushed changes) when the disk gets full */
+async function keepStorage() {
+  try {
+    if (navigator.storage && navigator.storage.persist) {
+      S.storagePersisted = (await navigator.storage.persisted()) || (await navigator.storage.persist());
+      emit();
+    }
+  } catch (e) { /* not supported here */ }
 }
 
 function registerWorker() {
@@ -65,25 +76,33 @@ export async function syncRemote() {
   if (!v || !v.hosted || !S.campaign || !S.working || syncing || S.review || S.screen !== 'app') return;
   syncing = true;
   try {
-    const r = await v.changes(S.remoteSeq || 0);
     const prefix = S.campaign.path + '/';
     let changed = 0;
     const files = new Set(S.files);
-    for (const c of r.changes) {
-      const p = c.path;
-      if (!p.startsWith(prefix) || !/\.md$/i.test(p)) continue;
-      if (S.working.pending.has(p)) continue;
-      if (c.action === 'trash') {
-        if (S.working.base.has(p)) { S.working.base.delete(p); files.delete(p); changed++; }
-        await v.noteGone(p);
-      } else {
-        const text = await v.readText(p);
-        await v.noteSeen(p);
-        if (S.working.base.get(p) !== text) { S.working.base.set(p, text); files.add(p); changed++; }
+    let since = S.remoteSeq || 0;
+    for (let round = 0; round < 200; round++) {         // the server hands changes over in pages when a lot moved: keep asking until it says that is all
+      const r = await v.changes(since);
+      for (const c of r.changes) {
+        const p = c.path;
+        if (!p.startsWith(prefix) || !/\.md$/i.test(p)) continue;
+        if (S.working.pending.has(p)) continue;
+        if (c.action === 'trash') {
+          if (S.working.base.has(p)) { S.working.base.delete(p); files.delete(p); changed++; }
+          await v.noteGone(p);
+        } else {
+          const text = await v.readText(p);
+          await v.noteSeen(p);
+          if (S.working.base.get(p) !== text) { S.working.base.set(p, text); files.add(p); changed++; }
+        }
       }
+      if (r.version && r.version !== __DMF_VERSION__ && S.newVersion !== r.version) S.newVersion = r.version;     // the server was updated while this page stayed open: offer the Reload (never done for you)
+      since = r.seq;
+      S.remoteSeq = r.seq;
+      saveSeq(r.seq);
+      if (!r.more) break;
     }
-    S.remoteSeq = r.seq;
-    saveSeq(r.seq);
+    S.lastSync = Date.now();
+    emit();
     if (changed) {
       S.files = [...files].sort();
       S.folders = topFolders(S.files, S.campaign.path, S.dirs);

@@ -1,4 +1,4 @@
-import { dirname, basename } from './util.js';
+import { dirname, basename, pool } from './util.js';
 import { OfflineCache } from './offlinecache.js';
 
 /* A vault is anything that can list, read and write files by vault-relative
@@ -229,6 +229,9 @@ export class ServerVault extends HttpVault {
     this.versions = new Map();               // the server's version number for each note I have read or written
     this.cache = new OfflineCache(name);
     this.online = true;
+    this._probed = false; this._probe = null;
+    this.snap = null;                        // path -> version, only while a campaign is being opened (see beginBulk)
+    this._deadUntil = 0;                     // while the clock is before this, requests give up at once (the server just failed to answer)
     this.onStatus = null;                    // called with true/false when reaching the server starts or stops working
     this.device = deviceId();
   }
@@ -236,14 +239,33 @@ export class ServerVault extends HttpVault {
   async _call(op, path, init = {}, more = '') {
     const extra = this.pushId && (op === 'write' || op === 'trash') ? '&push=' + encodeURIComponent(this.pushId) : '';
     const url = this.base + '/api/' + op + '?path=' + encodeURIComponent(path || '') + extra + '&device=' + encodeURIComponent(this.device) + more;
-    let res;
-    try { res = await fetch(url, Object.assign({}, init, { credentials: 'same-origin', headers: Object.assign({ 'X-DMF-Token': this.token }, init.headers || {}) })); }
-    catch (e) {
-      this._setOnline(false);
+    const offline = () => {
       const err = new Error('Cannot reach the DM Forge server. You can keep working: your changes are saved on this device and can be pushed once it is reachable again.');
       err.offline = true;
-      throw err;
+      return err;
+    };
+    // The very first request of a visit asks the server a quick question first, so a stalled link is noticed in 4 seconds rather than at the
+    // end of the first real request's own wait.
+    if (op !== 'ping' && !this._probed) {
+      if (!this._probe) this._probe = this._call('ping', '').then(() => true, () => false).then(ok => { this._probed = true; return ok; });
+      await this._probe;
     }
+    // The server just failed to answer: for a few seconds every other request gives up at once (the saved copy is used), instead of each one
+    // waiting its own turn. The ping that checks whether it is back is the only request that still tries.
+    if (op !== 'ping' && this._deadUntil > Date.now()) { this._setOnline(false); throw offline(); }
+    // A server that takes the connection but never answers (a stalled link, a restart in progress) must read as "offline", not freeze the page.
+    const ms = op === 'ping' ? 4000 : (op === 'write' || op === 'trash' || op.startsWith('atlas') || op === 'undo-push' || op === 'backup' ? 30000 : 8000);
+    const ctl = typeof AbortController === 'function' ? new AbortController() : null;
+    const timer = ctl ? setTimeout(() => ctl.abort(), ms) : null;
+    let res;
+    try { res = await fetch(url, Object.assign({}, init, { credentials: 'same-origin', signal: ctl ? ctl.signal : undefined, headers: Object.assign({ 'X-DMF-Token': this.token }, init.headers || {}) })); }
+    catch (e) {
+      this._deadUntil = Date.now() + 3000;
+      this._setOnline(false);
+      throw offline();
+    }
+    finally { if (timer) clearTimeout(timer); }
+    this._deadUntil = 0;
     this._setOnline(true);
     if (!res.ok) {
       let body = null;
@@ -259,6 +281,12 @@ export class ServerVault extends HttpVault {
   _notCached() { const e = new Error('That has not been saved on this device yet, so it cannot be opened without a connection.'); e.offline = true; return e; }
   async readText(path) {
     try {
+      // While a campaign is being opened, a note this device already holds at the server's current version is not downloaded again
+      if (this.snap) {
+        const want = this.snap.get(path);
+        const c = want ? await this.cache.get('text', path) : null;
+        if (c && c.version === want) { this.versions.set(path, want); return c.text; }
+      }
       const res = await this._call('read', path);
       const text = await res.text();
       const version = +res.headers.get('X-DMF-Version') || 0;
@@ -344,6 +372,29 @@ export class ServerVault extends HttpVault {
   /* the server's feed of changes after `since`, and the number to ask from next time. A huge `since` just returns the current number. */
   async changes(since) { return (await this._call('changes', '', {}, '&since=' + encodeURIComponent(since))).json(); }
   async seqNow() { return (await this.changes(Number.MAX_SAFE_INTEGER)).seq; }
+  /* Opening a campaign: ask once which version of every note the server has, so only the notes that changed are downloaded.
+     A note's text never changes for a given version number, so a saved copy at the current version is exactly right. */
+  async beginBulk() {
+    try { const j = await (await this._call('snapshot', '')).json(); this.snap = new Map(j.files.map(f => [f.path, f.version])); }
+    catch (e) { this.snap = null; }
+  }
+  endBulk() { this.snap = null; }
+  async status() { return (await this._call('status', '')).json(); }
+  async hold(hours) { return (await this._call('hold', '', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ hours }) })).json(); }
+  /* which of these files this device holds a copy of: { texts: Set, blobs: Set } */
+  async savedHere() { return { texts: new Set(await this.cache.paths('text')), blobs: new Set(await this.cache.paths('blob')) }; }
+  /* download and keep everything in `paths` that is not saved yet (notes as text, everything else as a file), a few at a time */
+  async saveForOffline(paths, onProgress) {
+    const have = await this.savedHere();
+    const todo = paths.filter(p => /\.md$/i.test(p) ? !have.texts.has(p) : !have.blobs.has(p));
+    let done = 0, failed = 0;
+    await pool(todo, 4, async p => {
+      try { if (/\.md$/i.test(p)) await this.readText(p); else await this.readBlob(p); }
+      catch (e) { failed++; }
+      if (onProgress) onProgress(++done, todo.length);
+    });
+    return { fetched: todo.length - failed, failed, already: paths.length - todo.length };
+  }
   async history(path) { return (await this._call('history', path)).json(); }
   async versionText(path, version) { return (await this._call('version', path, {}, '&v=' + encodeURIComponent(version))).text(); }
   async search(q) { return (await this._call('search', '', {}, '&q=' + encodeURIComponent(q))).json(); }

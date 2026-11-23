@@ -50,6 +50,16 @@ export function defaultDecisions(items) {
   return d;
 }
 
+/* Whether a review can go through with nobody watching (the "push for me when I stop" setting). It never does when a note changed on the
+   server in the meantime, when two edits had to be merged, or when a note would be deleted outright (a move is fine). Returns { ok, reason }. */
+export function autoPushCheck(items) {
+  const vis = visibleItems(items);
+  if (!vis.length) return { ok: false, reason: 'nothing' };
+  if (vis.some(it => it.conflict || it.merged)) return { ok: false, reason: 'conflict' };
+  if (vis.some(it => it.kind === 'delete')) return { ok: false, reason: 'delete' };
+  return { ok: true, reason: '' };
+}
+
 async function uniquePath(vault, path) {
   const dir = dirname(path), file = basename(path);
   const m = file.match(/^(.*?)(\.[^.]+)?$/);

@@ -7,6 +7,9 @@ services:
     image: dmforge:v3
     container_name: dmforge
     restart: unless-stopped
+    logging:
+      driver: json-file
+      options: { max-size: "10m", max-file: "3" }      # logs never grow without limit
     user: "${DMFORGE_UID:-1000}:${DMFORGE_GID:-1000}"
     ports:
       # Never "0.0.0.0" or a bare "8765:8765": that would put the app on every network this machine is on.

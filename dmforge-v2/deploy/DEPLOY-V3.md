@@ -126,26 +126,51 @@ by itself and tells you which one worked; to make it permanent, put `DMFORGE_DMA
 
 Every night at `DMFORGE_BACKUP_HOUR` (default 3am) the server:
 
-- copies the database to `data/backups/dmforge-<date>.db` (the newest `DMFORGE_BACKUP_KEEP`, default 14, are kept), and
+- copies the database to `data/backups/dmforge-<date>.db.gz`. The copy is **checked** (SQLite's own check, and every note and picture counted against the live
+  database) and compressed before it is kept, and the newest `DMFORGE_BACKUP_KEEP` (default 14) stay. A copy that fails the check is thrown away and reported as FAILED;
 - refreshes `export/` with every note as an ordinary `.md` file. A note you deleted is moved to `export/.removed/<date>/`, never erased.
   You can open `export/` in Obsidian (read-only is safest).
 
-Please also copy `data/` somewhere that is not this machine now and then (a USB drive, another computer). One folder is the whole campaign.
+The outcome of the last backup (and of the last update, the free disk space and the size of the database) is on **Settings, Server** in the app. If a backup fails, or the disk is
+getting full, the top bar shows **Server needs a look** so you hear about it without reading logs.
+
+**Everything above is on this one machine.** If its disk dies or it is stolen, the campaign and all these copies go together. So keep a copy somewhere else:
+
+- **From the app, any time:** Settings, Server, **Download notes (.zip)** (every note and picture as ordinary files, openable in Obsidian) or **Download database (.gz)**
+  (everything, with every earlier version of every note). Do it before you travel, or now and then.
+- **Automatically, on your Mac:** `tools/pull-backup.sh` downloads both copies over Tailscale and keeps the newest 14 of each. Put your access token in a private file, test it once by hand,
+  then let macOS run it every day:
+
+```
+printf '%s' 'YOUR-TOKEN' > ~/.dmforge-token && chmod 600 ~/.dmforge-token
+bash ~/dmforge/tools/pull-backup.sh https://<your-server>.<your-tailnet>.ts.net
+open ~/Documents/DM-Forge-backups
+# once that works: edit the two names inside tools/com.dmforge.pull-backup.plist, then
+cp tools/com.dmforge.pull-backup.plist ~/Library/LaunchAgents/
+launchctl load ~/Library/LaunchAgents/com.dmforge.pull-backup.plist
+```
+
+  (If the Mac is asleep at the set time, it runs when it wakes. The script never deletes anything from the server, and the token is not put on the command line.)
 
 **Restore from a nightly copy:**
 
 ```
 docker compose down
 rm -f data/dmforge.db data/dmforge.db-wal data/dmforge.db-shm
-cp data/backups/dmforge-YYYYMMDD-HHMMSS.db data/dmforge.db
+gunzip -c data/backups/dmforge-YYYYMMDD-HHMMSS.db.gz > data/dmforge.db
 docker compose up -d
 ```
+
+(A downloaded `.db.gz` restores the same way. A `.zip` is put back with `dmforge_io.py import` on the unzipped folder, as in step 5.)
 
 You can also take a copy right now, with no downtime (it lands in `data/backups`):
 
 ```
 docker compose exec dmforge python -c "import os,urllib.request as u;print(u.urlopen(u.Request('http://127.0.0.1:8765/api/backup',method='POST',headers={'X-DMF-Token':os.environ['DMFORGE_TOKEN']})).read())"
 ```
+
+**Disk space.** Pictures are kept once in the database, but every database copy includes them: with many large maps the copies add up. Settings, Server shows the free space and the
+nightly copies are compressed; lower `DMFORGE_BACKUP_KEEP` in `.env` if the disk is small. Docker's own logs are limited to 30 MB.
 
 ## Updating (automatic)
 
@@ -177,19 +202,23 @@ crontab -l
 
 **What happens when a release is published**
 
-1. The database is copied to `data/backups/` first. If that copy fails, nothing is updated.
+1. The database is copied to `data/backups/pre-update-<date>.db.gz` first (the newest 10 are kept). If that copy fails, nothing is updated.
 2. The new files are downloaded and the new version is built while the old one keeps running.
 3. The container is swapped (a few seconds), then checked until it reports healthy.
 4. If the build fails or the new version is not healthy, the old version is put back automatically and that release is skipped until a newer one is published.
-5. Open DM Forge pages show "Reload to use it". Unpushed changes are kept, and the app copes with the few seconds the server is away.
+5. Open DM Forge pages show a bar with "Reload to use it" within about 30 seconds (it never reloads for you, so nothing is lost mid-edit), and the app copes with the few seconds the server is away.
 
-Everything is written to `~/dmforge/update.log`. `./update.sh --status` shows the version running and the last log lines; `./update.sh` checks right now.
+Everything is written to `~/dmforge/update.log`, and the outcome of the last update (and when the server last looked) is on **Settings, Server** in the app, which also warns you if a
+release failed to install or the server has stopped looking.
+
+**Before a session: Settings, Server, Hold updates** stops installs for 8 hours (it ends by itself, so it cannot be forgotten; Resume updates ends it sooner). Without the app:
+`echo $(( $(date +%s) + 8*3600 )) > ~/dmforge/data/.hold-updates`. `./update.sh --status` shows the version running, any hold, and the last log lines; `./update.sh` checks right now.
 
 **To pause automatic updates:** `crontab -e` and put a `#` at the start of the update.sh line. **To go back to manual updates:** copy a zip over as before (the git folder is just files).
 
 ## Working with no connection
 
-- Everything you open is saved on the device. Opening DM Forge with no server (a train, bad signal at a table) works as long as that
+- Everything you open is saved on the device. Opening the campaign again downloads only the notes that changed. For pictures and files, Settings, Server, **Save everything for offline** fetches the rest before you travel. Opening DM Forge with no server (a train, bad signal at a table) works as long as that
   device has opened the campaign once while online, and used the HTTPS address above.
 - Edits are kept as "unpushed changes" as always. The top bar says **Offline** and pushing waits.
 - When the server is back the Offline note disappears by itself. Push as normal: the review shows each note and flags any that changed
@@ -202,11 +231,18 @@ Everything is written to `~/dmforge/update.log`. `./update.sh --status` shows th
 - The port is bound to loopback; Tailscale carries it. Never publish it on `0.0.0.0` or with `tailscale funnel`.
 - Every request needs the token (as a header, or the sign-in cookie, which is HttpOnly and SameSite=Strict). Wrong tokens are slowed down.
 - The container runs as your user, with a read-only filesystem, no extra Linux capabilities and no privilege escalation.
-- Changing `DMFORGE_TOKEN` signs every device out.
+- Changing `DMFORGE_TOKEN` signs every device out. Only wrong tokens typed in count against the sign-in limit, and the right token always gets in, so nobody can lock you out.
+- **The automatic updater runs whatever is on the `dmforge-release` branch.** Whoever can push to it can run code on this machine, which holds your whole campaign. Protect the GitHub account
+  that owns the repository (a passkey or two-factor sign-in) and turn on branch protection for `dmforge-release` (no force pushes, no deletion).
+- The default address in `docker-compose.yml` and in these notes is your tailnet name. If the repository is public, that name is public too (it is not a secret that lets anyone in, but
+  it says which tailnet this is); put your own value in `.env` and keep `docker-compose.override.yml` out of the repository.
+- A stalled connection is dropped after 30 seconds, and a request with no valid token is turned away without its body being read.
+- Set the mini PC's BIOS option "Restore on AC power loss" (or "Power on after power failure") to on, so a power cut does not leave it off until you press the button.
 
 ## Trouble
 
 - **The page asks for the token again and again:** the address changed (http vs https, or a different name). Use the one `tailscale serve status` shows.
 - **"Forbidden" right after step 4:** `DMFORGE_HOSTS` does not match the name you opened. Fix it in `.env`, then `docker compose up -d`.
 - **`permission denied` on `data/`:** the folders were made by root. `sudo chown -R "$(id -u):$(id -g)" data export`.
+- **"Server needs a look" in the top bar:** open Settings, Server. It names the problem: a failed backup, low disk space, an update that did not install, or no look for updates in a while (check `crontab -l`).
 - **The container restarts:** `docker compose logs dmforge` says why (usually a missing `DMFORGE_TOKEN`).

@@ -13,6 +13,7 @@ import { NEGLECT_CHOICES } from '../core/forgetting.js';
 import { FONT_SETS } from '../core/fontsets.js';
 import { SnapshotSection } from './snapshot.jsx';
 import { ClaudePanel } from './claude.jsx';
+import { ServerPanel, BackupButtons, HoldButtons, OfflineButtons } from './serverpanel.jsx';
 
 export const SETTINGS_CATS = [
   { id: 'appearance', title: 'Appearance', blurb: 'Colours and typeface' },
@@ -21,6 +22,7 @@ export const SETTINGS_CATS = [
   { id: 'sessions', title: 'Sessions', blurb: 'Where you left off, and what you might be forgetting' },
   { id: 'library', title: 'Library and lists', blurb: 'Monsters, generators and long lists' },
   { id: 'claude', title: 'Claude', blurb: 'The optional helper, and the campaign snapshot' },
+  { id: 'server', title: 'Server', blurb: 'Backups, updates, disk and your offline copy' },
   { id: 'data', title: 'Data and updates', blurb: 'Undo a push, the trash, versions and updates' },
 ];
 
@@ -174,6 +176,11 @@ function useItems() {
     <Row key="leave" id="leave" title="When I leave an edit I have not saved" desc="Saved edits wait as pending changes, ready to push." more="“Ask me first” lets you save, discard or keep editing. The same applies when you close a tab you are editing in.">
       <Seg name="leaveEdit" label="When I move away from an edit I have not saved" value={st.leaveEdit} onChange={v => updateSetting('leaveEdit', v)} options={[{ v: 'auto', label: 'Save it for me', id: 'setAuto' }, { v: 'ask', label: 'Ask me first', id: 'setAsk' }]} />
     </Row>));
+  add('writing', 'autopush', 'Push for me when I stop', 'push auto automatic idle quiet save server hosted v3', (
+    <Row key="autopush" id="autopush" title="Push for me when I stop" desc={S.hosted ? 'After you have not edited anything for a while, push your changes to the server as one push, so you never forget. Undo last push puts them back. It waits for you instead when a note changed on the server since you started, or when a note would be deleted.' : 'Needs the DM Forge server (V3).'}
+      sub={S.hosted && S.settings.autoPush ? <div class="so-sub"><label class="so-inline">After <select id="setAutoPushMins" aria-label="Quiet minutes before pushing" value={String(S.settings.autoPushMins || 10)} onChange={e => updateSetting('autoPushMins', Number(e.currentTarget.value))}>{[5, 10, 20, 30].map(m => <option key={m} value={String(m)}>{m} minutes</option>)}</select> without an edit</label></div> : null}>
+      <Switch id="setAutoPush" checked={!!S.settings.autoPush && S.hosted} label="Push for me when I stop" onChange={v => updateSetting('autoPush', v)} />
+    </Row>));
   add('writing', 'autoopen', 'Open the campaign I was last in', 'start startup launch campaign list resume', (
     <Row key="autoopen" id="autoopen" title="Open the campaign I was last in" desc="Skips the campaign list when DM Forge starts. Switch campaign still takes you to the list.">
       <Switch id="setAutoOpen" label="Open the campaign I was last in" checked={st.autoOpenLast !== false} onChange={v => updateSetting('autoOpenLast', v)} />
@@ -214,6 +221,23 @@ function useItems() {
   add('claude', 'snapshot', 'Campaign snapshot', 'snapshot summary inspiration campaign note', (
     <div key="snapshot" class="so so-block" data-set="snapshot"><SnapshotSection /></div>));
 
+  /* Server (V3) */
+  if (S.hosted) {
+    add('server', 'srvstatus', 'Server report', 'server version backup update disk space database status health', <ServerPanel key="srvstatus" />);
+    add('server', 'srvbackup', 'Download a backup', 'backup download zip database copy export markdown off-site safe', (
+      <Row key="srvbackup" id="srvbackup" title="Download a backup" desc="A copy of the whole campaign, made right now, on this device: every note as a Markdown file (a .zip you can open in Obsidian), or the database itself (with every earlier version of every note). Keep one somewhere that is not the server.">
+        <BackupButtons />
+      </Row>));
+    add('server', 'srvoffline', 'Work with no connection', 'offline cache save pictures maps device persistent storage', (
+      <Row key="srvoffline" id="srvoffline" title="Work with no connection" desc="Notes are saved on this device as you open them. Pictures and files are only saved once you have looked at them, so this fetches the rest before you head somewhere with bad signal." stack>
+        <OfflineButtons />
+      </Row>));
+    add('server', 'srvhold', 'Hold updates', 'update hold pause session automatic install', (
+      <Row key="srvhold" id="srvhold" title="Hold updates" desc="Stops the server installing a new version for 8 hours (it starts again by itself afterwards). Handy before a session, so nothing restarts under you.">
+        <HoldButtons />
+      </Row>));
+  }
+
   /* Data and updates */
   add('data', 'undopush', 'Undo last push', 'undo push restore notes helper', (
     <Row key="undopush" id="undopush" title="Undo last push" desc={S.helper ? (S.undo ? 'Put back the ' + S.undo.files + ' note' + (S.undo.files === 1 ? '' : 's') + ' your last push changed. The last 10 pushes are kept.' : 'Put back the notes your last push changed. The last 10 pushes are kept.') : 'Needs the helper (start DM Forge with Start DM Forge.command).'}>
@@ -248,7 +272,7 @@ export function SettingsPage() {
   useApp();
   const [q, setQ] = useState('');
   const items = useItems();
-  const cat = SETTINGS_CATS.find(c => c.id === S.settingsCat) ? S.settingsCat : 'appearance';
+  const cat = SETTINGS_CATS.find(c => c.id === S.settingsCat && (c.id !== 'server' || S.hosted)) ? S.settingsCat : 'appearance';
   const terms = q.trim().toLowerCase().split(/\s+/).filter(Boolean);
   const hits = terms.length ? items.filter(i => terms.every(t => i.words.includes(t))) : null;
   const shown = hits || items.filter(i => i.cat === cat);
@@ -269,7 +293,7 @@ export function SettingsPage() {
       </div>
       <div class="set-layout">
         <nav class="set-nav" aria-label="Settings categories">
-          {SETTINGS_CATS.map(c => (
+          {SETTINGS_CATS.filter(c => c.id !== 'server' || S.hosted).map(c => (
             <button key={c.id} class={'set-cat' + (!hits && c.id === cat ? ' on' : '')} data-setcat={c.id} aria-current={!hits && c.id === cat ? 'page' : undefined} onClick={() => { setQ(''); setSettingsCat(c.id); }}>
               <span class="set-cat-t">{c.title}</span><span class="set-cat-b">{c.blurb}</span>
             </button>

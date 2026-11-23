@@ -13,7 +13,8 @@ import { buildBundle, parseBundle, planImport } from '../core/settingsbundle.js'
 import { patchFrontmatter, applyBody, splitFrontmatter, setFrontmatterRaw } from '../core/frontmatter.js';
 import { appendToSection, upsertBlock } from '../core/markdown.js';
 import { buildNoteText, defaultBody, CAMPAIGN_FOLDERS, campaignIndexText } from '../core/templates.js';
-import { buildReview, applyPush, defaultDecisions, visibleItems } from '../core/push.js';
+import { buildReview, applyPush, defaultDecisions, visibleItems, autoPushCheck } from '../core/push.js';
+import { serverWarning } from '../core/serverinfo.js';
 import { basename, dirname, today, sanitizeName, join, uid } from '../core/util.js';
 import { reformatBody } from '../core/reformat.js';
 import { applyLinkToText, linkText } from '../core/mentions.js';
@@ -598,6 +599,55 @@ export async function runPush() {
   }
 }
 function persistAfterPush() { touch(); flushPending(); }
+
+/* "Push for me when I stop" (V3 server only, off unless you turn it on): once nothing has been edited for a while, with no editor holding unsaved text and
+   no dialog or review open, the unpushed changes go to the server as one push (so Undo last push covers all of it). It never pushes by itself when a
+   note changed on the server in the meantime, when two edits had to be merged, or when a note would be deleted: those wait for you and the review. */
+let autoPushing = false, autoPushNoted = '';
+export async function autoPushTick() {
+  const st = S.settings;
+  if (autoPushing || !st.autoPush || !S.hosted || !S.online || !S.vault || !S.working || !S.campaign || S.screen !== 'app') return false;
+  if (!S.working.count || S.review || S.dialog || dirtyDrafts().length) return false;
+  if (Date.now() - (S.lastTouch || 0) < (st.autoPushMins || 10) * 60000) return false;
+  autoPushing = true;
+  try {
+    const items = await buildReview(S.vault, S.working);
+    const chk = autoPushCheck(items);
+    if (!chk.ok) {
+      const key = chk.reason + ':' + S.working.count;
+      if (chk.reason !== 'nothing' && autoPushNoted !== key) {
+        autoPushNoted = key;
+        toast(chk.reason === 'conflict' ? 'Auto-push is waiting: a note changed on the server since you started editing it. Press Push to review.' : 'Auto-push is waiting: a note is set to be deleted. Press Push to review it.');
+      }
+      return false;
+    }
+    const pid = S.vault.beginPush ? 'p' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6) : '';
+    if (pid) S.vault.beginPush(pid);
+    try {
+      const results = await applyPush(S.vault, S.working, items, defaultDecisions(items));
+      settleLeftOff(results.filter(x => x.status === 'written').map(x => x.path));
+      S.dataRev++;
+      persistAfterPush();
+      const n = results.filter(x => x.status === 'written' || x.status === 'deleted').length, bad = results.filter(x => x.status === 'error').length;
+      toast('Pushed ' + n + ' change' + (n === 1 ? '' : 's') + ' for you after ' + (st.autoPushMins || 10) + ' quiet minutes. Settings, Data, Undo last push puts them back.' + (bad ? ' ' + bad + ' could not be pushed: press Push to see why.' : ''), !!bad);
+      return true;
+    } finally { if (pid) { S.vault.endPush(); refreshUndo(); } }
+  } catch (e) {
+    return false;       // offline or the server is busy: the changes stay saved on this device and the next quiet moment tries again
+  } finally { autoPushing = false; }
+}
+
+/* the server's own report (version, last backup, last update, disk) and what in it needs a look; polled by the shell while online */
+export async function refreshServerInfo() {
+  const v = S.vault;
+  if (!v || !v.status || !S.hosted) return null;
+  try {
+    const info = await v.status();
+    S.serverInfo = info; S.serverWarn = serverWarning(info);
+    emit();
+    return info;
+  } catch (e) { return null; }
+}
 export function closeReview() { set({ review: null }); }
 
 /* ---------- categories (a category is a top-level folder of the campaign) ---------- */
@@ -974,6 +1024,8 @@ function cleanSettings(o) {
   if (o && (o.darkStyle === 'warm' || o.darkStyle === 'slate')) out.darkStyle = o.darkStyle;
   if (o && FONT_SET_IDS.includes(o.fontSet)) out.fontSet = o.fontSet;
   if (o && PALETTE_IDS.includes(o.palette)) out.palette = o.palette;
+  if (o && typeof o.autoPush === 'boolean') out.autoPush = o.autoPush;
+  if (o && [5, 10, 20, 30].includes(o.autoPushMins)) out.autoPushMins = o.autoPushMins;
   if (o && Array.isArray(o.recentGens)) out.recentGens = [...new Set(o.recentGens.filter(x => typeof x === 'string' && x.length < 40))].slice(0, 6);
   return out;
 }

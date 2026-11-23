@@ -358,7 +358,7 @@ Instead of running from your Mac, DM Forge can run on a small server of yours (D
 campaign is kept in a database with every earlier version of every note, the server makes a nightly copy of the database and a
 nightly plain-Markdown copy of the whole campaign, and the app keeps working with no connection (edits wait as unpushed changes, and
 the server will not overwrite a note that changed since you started). Everything about setting it up is in `deploy/DEPLOY-V3.md`;
-the plan and what is still to come are in `V3-PLAN.md`. The server can install new releases by itself (`update.sh`, checked every minute, with a database copy first and an automatic roll back). The Mac helper and folder mode are unchanged.
+the plan and what is still to come are in `V3-PLAN.md`. The server can install new releases by itself (`update.sh`, checked every minute, with a database copy first and an automatic roll back). The server limits wrong-token guesses (the right token is never locked out), drops stalled connections, sends the app compressed, and if it stalls the app opens from its saved copy and carries on offline. **Settings, Server** (V3 only) shows the last backup (checked and compressed every night), the last update, free disk space and what this device has saved for offline; it also holds updates for 8 hours before a session, downloads a copy of the whole campaign, and (off by default) can push your edits for you after a quiet spell. `tools/pull-backup.sh` keeps a copy on your Mac. The Mac helper and folder mode are unchanged.
 
 ## Dungeons from DMAtlas
 

@@ -174,6 +174,22 @@ class AtlasClientTests(unittest.TestCase):
         e = self.fails(dead.dungeons, status=502, text='Cannot reach DMAtlas')
         self.assertIn('Nothing was changed', e.message)
 
+    def test_a_tailnet_address_refused_from_a_container_says_what_to_do(self):
+        # a closed port on a ".ts.net" name is exactly what a container sees when it tries a tailnet address
+        a = A.Atlas('http://water.example.ts.net:9', timeout=2)
+        a.base = 'http://127.0.0.1:9'.replace('127.0.0.1', 'localhost')
+        e = self.fails(a.dungeons, status=502, text='Cannot reach DMAtlas')
+        self.assertNotIn('Docker container', e.message)          # a plain address gets no tailnet advice
+        b = A.Atlas('http://127.0.0.1:9')
+        b.base = 'http://100.64.0.1:9'
+        b._opener = A.urllib.request.build_opener()
+        import urllib.error as UE
+        import unittest.mock as M
+        with M.patch.object(b._opener, 'open', side_effect=UE.URLError(ConnectionRefusedError(111, 'Connection refused'))):
+            e = self.fails(b.dungeons, status=502)
+        self.assertIn('Docker container', e.message)
+        self.assertIn('docker-compose.dmatlas.yml', e.message)
+
     def test_not_configured(self):
         self.fails(A.Atlas('').dungeons, status=503, text='DMFORGE_DMATLAS_URL')
 

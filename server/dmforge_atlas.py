@@ -87,7 +87,12 @@ class Atlas:
                 raise AtlasError(404, 'DMAtlas does not have that (it may not be published).')
             raise AtlasError(502, 'DMAtlas answered %d.' % e.code)
         except (urllib.error.URLError, OSError, ValueError) as e:
-            raise AtlasError(502, 'Cannot reach DMAtlas at %s (%s). Is it running, and can this server reach that address? Nothing was changed.' % (self.base, getattr(e, 'reason', e)))
+            why = getattr(e, 'reason', e)
+            hint = ''
+            host = (urllib.parse.urlsplit(self.base).hostname or '').lower()
+            if isinstance(why, ConnectionRefusedError) and (host.endswith('.ts.net') or host.startswith('100.')):
+                hint = ' A tailnet address cannot be used from inside a Docker container: join DMAtlas\'s Docker network instead (deploy/docker-compose.dmatlas.yml, and see Importing dungeons in deploy/DEPLOY-V3.md).'
+            raise AtlasError(502, 'Cannot reach DMAtlas at %s (%s). Is it running, and can this server reach that address?%s Nothing was changed.' % (self.base, why, hint))
         if len(data) > limit:
             raise AtlasError(502, 'DMAtlas sent something larger than the %d byte limit.' % limit)
         return data, ctype

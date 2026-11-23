@@ -17,6 +17,7 @@ Standard library only.
 """
 import hashlib
 import json
+import os
 import re
 import struct
 import urllib.error
@@ -56,10 +57,27 @@ def parse_base(url):
 
 
 class Atlas:
-    def __init__(self, base, timeout=20):
+    def __init__(self, base, timeout=20, host=''):
         self.base = parse_base(base)
         self.timeout = timeout
+        self.host_header = (host or '').strip()      # the Host name to present, when DMAtlas only accepts its own (DMFORGE_DMATLAS_HOST)
+        self.host_used = ''                           # the one that worked last, for the connection check to report
         self._opener = urllib.request.build_opener(_NoRedirect)
+
+    def _host_candidates(self):
+        """Host names to present, in order. First the natural one (the address as written); DMAtlas answers 421 Misdirected Request when it only
+        accepts its own public name, so then the names this server is known by (DMFORGE_HOSTS, with and without the port), then localhost."""
+        if self.host_header:
+            return [self.host_header]
+        u = urllib.parse.urlsplit(self.base)
+        port = ':%d' % u.port if u.port else ''
+        names = [x.strip() for x in os.environ.get('DMFORGE_HOSTS', '').split(',') if x.strip()] + ['localhost', '127.0.0.1']
+        out = [None]
+        for n in names:
+            for h in (n + port, n):
+                if h not in out:
+                    out.append(h)
+        return out[:9]
 
     @property
     def configured(self):
@@ -69,8 +87,31 @@ class Atlas:
     def _get(self, path, limit, accept):
         if not self.base:
             raise AtlasError(503, 'DMAtlas is not set up on this server. Set DMFORGE_DMATLAS_URL (see deploy/DEPLOY-V3.md).')
+        cands = [self.host_used] if self.host_used else self._host_candidates()
+        refused = []
+        for host in cands:
+            try:
+                data, ctype = self._get_once(path, limit, accept, host)
+            except AtlasError as e:
+                if getattr(e, 'misdirected', False) and host is not cands[-1] and len(cands) > 1:
+                    refused.append(host or 'the address as written')
+                    continue
+                if getattr(e, 'misdirected', False):
+                    refused.append(host or 'the address as written')
+                    raise AtlasError(502, 'DMAtlas answered 421 (Misdirected Request) to every host name we tried (%s). It only accepts its own public name: set DMFORGE_DMATLAS_HOST to that name (your tailnet name, such as water.example.ts.net) in .env.' % ', '.join(refused))
+                if self.host_used:               # what worked before does not now: forget it and look again next time
+                    self.host_used = ''
+                raise
+            self.host_used = host
+            return data, ctype
+        raise AtlasError(502, 'DMAtlas could not be asked.')
+
+    def _get_once(self, path, limit, accept, host):
         url = self.base + path
-        req = urllib.request.Request(url, headers={'Accept': accept, 'User-Agent': 'DMForge-import'})
+        headers = {'Accept': accept, 'User-Agent': 'DMForge-import'}
+        if host:
+            headers['Host'] = host
+        req = urllib.request.Request(url, headers=headers)
         try:
             with self._opener.open(req, timeout=self.timeout) as r:
                 if r.status != 200:
@@ -85,12 +126,14 @@ class Atlas:
         except urllib.error.HTTPError as e:
             if e.code == 404:
                 raise AtlasError(404, 'DMAtlas does not have that (it may not be published).')
-            raise AtlasError(502, 'DMAtlas answered %d.' % e.code)
+            err = AtlasError(502, 'DMAtlas answered %d.' % e.code)
+            err.misdirected = e.code == 421
+            raise err
         except (urllib.error.URLError, OSError, ValueError) as e:
             why = getattr(e, 'reason', e)
             hint = ''
-            host = (urllib.parse.urlsplit(self.base).hostname or '').lower()
-            if isinstance(why, ConnectionRefusedError) and (host.endswith('.ts.net') or host.startswith('100.')):
+            h = (urllib.parse.urlsplit(self.base).hostname or '').lower()
+            if isinstance(why, ConnectionRefusedError) and (h.endswith('.ts.net') or h.startswith('100.')):
                 hint = ' A tailnet address cannot be used from inside a Docker container: join DMAtlas\'s Docker network instead (deploy/docker-compose.dmatlas.yml, and see Importing dungeons in deploy/DEPLOY-V3.md).'
             raise AtlasError(502, 'Cannot reach DMAtlas at %s (%s). Is it running, and can this server reach that address?%s Nothing was changed.' % (self.base, why, hint))
         if len(data) > limit:
@@ -163,7 +206,7 @@ def main(argv=None):
     args = list(sys.argv[1:] if argv is None else argv)
     url = args[0] if args else os.environ.get('DMFORGE_DMATLAS_URL', '')
     try:
-        a = Atlas(url)
+        a = Atlas(url, host=os.environ.get('DMFORGE_DMATLAS_HOST', ''))
     except ValueError as e:
         print('Not a usable address: %s' % e)
         return 2
@@ -177,6 +220,8 @@ def main(argv=None):
         print('FAILED: %s' % e.message)
         return 1
     print('OK. %d published dungeon%s:' % (len(lst), '' if len(lst) == 1 else 's'))
+    if a.host_used and not a.host_header:
+        print('(DMAtlas only accepted the host name "%s". That is remembered while the server runs; to make it permanent put DMFORGE_DMATLAS_HOST=%s in .env.)' % (a.host_used, a.host_used))
     for d in lst[:20]:
         print('  - %s (%s levels, %s rooms)' % (d.get('name'), d.get('levels'), d.get('rooms')))
     return 0

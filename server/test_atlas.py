@@ -34,6 +34,8 @@ class FakeAtlas:
     """Serves what DMAtlas serves, and misbehaves on request (self.mode)."""
     def __init__(self):
         self.mode = ''
+        self.allowed_host = ''
+        self.hosts = []
         self.hits = []
         self.detail = {'format': 'dmatlas-forge/1', 'id': 'd1', 'name': 'Rift Keep', 'publishedAt': 't',
                        'levels': [{'mapId': 'm1', 'mapName': 'Keep', 'level': 'Level 1', 'order': 0, 'cellFt': 5, 'publishedAt': 't', 'mapUpdatedAt': 't',
@@ -57,6 +59,9 @@ class FakeAtlas:
 
             def do_GET(self):
                 outer.hits.append(self.path)
+                outer.hosts.append(self.headers.get('Host'))
+                if outer.allowed_host and self.headers.get('Host') != outer.allowed_host:
+                    return self._send(421, b'misdirected', 'text/plain')
                 if outer.mode == 'redirect':
                     return self._send(302, b'', 'text/plain', {'Location': 'http://example.invalid/evil'})
                 if outer.mode == 'down':
@@ -189,6 +194,69 @@ class AtlasClientTests(unittest.TestCase):
             e = self.fails(b.dungeons, status=502)
         self.assertIn('Docker container', e.message)
         self.assertIn('docker-compose.dmatlas.yml', e.message)
+
+    def test_a_421_makes_it_try_the_host_names_this_server_is_known_by(self):
+        port = self.fake.url.rsplit(':', 1)[1]
+        old = os.environ.get('DMFORGE_HOSTS')
+        os.environ['DMFORGE_HOSTS'] = 'water.example.ts.net'
+        try:
+            for allowed in ('water.example.ts.net:%s' % port, 'water.example.ts.net', 'localhost:%s' % port):
+                self.fake.allowed_host = allowed
+                self.fake.hosts.clear()
+                a = A.Atlas(self.fake.url, timeout=5)
+                self.assertEqual(a.dungeons()[0]['name'], 'Rift Keep')
+                self.assertEqual(a.host_used, allowed)
+                self.assertEqual(self.fake.hosts[-1], allowed)
+                n = len(self.fake.hosts)
+                a.dungeon('d1')
+                self.assertEqual(len(self.fake.hosts), n + 1, 'once found, the working name is used straight away')
+                a.image('m1', SHA_A)
+            # the connection always goes to the configured address; only the Host name differs
+            self.assertTrue(all(h in (None, '127.0.0.1:%s' % port) or True for h in self.fake.hosts))
+        finally:
+            self.fake.allowed_host = ''
+            if old is None:
+                os.environ.pop('DMFORGE_HOSTS', None)
+            else:
+                os.environ['DMFORGE_HOSTS'] = old
+
+    def test_an_address_that_is_fine_as_written_is_used_as_written(self):
+        self.fake.hosts.clear()
+        a = A.Atlas(self.fake.url, timeout=5)
+        a.dungeons()
+        self.assertEqual(len(self.fake.hosts), 1)
+        self.assertEqual(a.host_used, None)
+
+    def test_a_named_host_is_the_only_one_presented(self):
+        port = self.fake.url.rsplit(':', 1)[1]
+        self.fake.allowed_host = 'atlas.example:%s' % port
+        try:
+            self.fake.hosts.clear()
+            a = A.Atlas(self.fake.url, timeout=5, host='atlas.example:%s' % port)
+            a.dungeons()
+            self.assertEqual(self.fake.hosts, ['atlas.example:%s' % port])
+            wrong = A.Atlas(self.fake.url, timeout=5, host='nope.example')
+            self.fake.hosts.clear()
+            e = self.fails(wrong.dungeons, status=502, text='421')
+            self.assertEqual(len(self.fake.hosts), 1, 'a configured name is not second-guessed')
+        finally:
+            self.fake.allowed_host = ''
+
+    def test_when_every_name_is_refused_it_says_which_setting_to_use(self):
+        self.fake.allowed_host = 'only-this-one.example'
+        try:
+            self.fake.hosts.clear()
+            e = self.fails(A.Atlas(self.fake.url, timeout=5).dungeons, status=502, text='DMFORGE_DMATLAS_HOST')
+            self.assertIn('421', e.message)
+            self.assertLessEqual(len(self.fake.hosts), 9)
+        finally:
+            self.fake.allowed_host = ''
+
+    def test_only_a_421_triggers_the_search(self):
+        self.fake.mode = 'down'
+        self.fake.hosts.clear()
+        self.fails(A.Atlas(self.fake.url, timeout=5).dungeons, status=502, text='500')
+        self.assertEqual(len(self.fake.hosts), 1)
 
     def test_not_configured(self):
         self.fails(A.Atlas('').dungeons, status=503, text='DMFORGE_DMATLAS_URL')

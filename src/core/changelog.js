@@ -7,6 +7,12 @@ export const KINDS = { new: 'New', improved: 'Improved', fixed: 'Fixed' };
 
 export const CHANGELOG = [
   {
+    version: '2.58.2', date: '2026-11-23', title: 'DMAtlas that only accepts its own host name',
+    changes: [
+      ['fixed', 'If DMAtlas answers 421 (Misdirected Request) because it only accepts its own public host name, the importer now tries the names this server is known by (your tailnet name, with and without the port) and localhost by itself, remembers the one that works, and tells you which in the connection check. If none works it says to set DMFORGE_DMATLAS_HOST in .env.'],
+    ],
+  },
+  {
     version: '2.58.1', date: '2026-11-23', title: 'DMAtlas on the same server',
     changes: [
       ['fixed', 'When DM Forge and DMAtlas run as containers on the same machine, the importer could not reach DMAtlas by its tailnet address (a container is refused there). deploy/docker-compose.dmatlas.yml has DM Forge join DMAtlas\'s Docker network instead and use http://dmatlas:8767; the steps are in deploy/DEPLOY-V3.md. The "cannot reach DMAtlas" message now says this when it recognises the case.'],

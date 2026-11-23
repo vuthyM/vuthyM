@@ -1,0 +1,20 @@
+# Lets DM Forge reach DMAtlas when both run as containers on the same machine.
+# A container cannot use DMAtlas's tailnet address (that port is only open to other devices on the tailnet), so DM Forge joins
+# DMAtlas's own Docker network and talks to it by container name. Nothing is published beyond loopback.
+#
+#   cp deploy/docker-compose.dmatlas.yml docker-compose.override.yml
+#   (in .env)  DMFORGE_DMATLAS_URL=http://dmatlas:8767
+#   docker compose up -d
+#
+# `docker compose` reads docker-compose.override.yml by itself, and it is not part of the repository, so updates leave it alone.
+# Find the network's name with:  docker inspect dmatlas --format '{{json .NetworkSettings.Networks}}'     (the name is the first key)
+# If you ever remove DMAtlas (or its network), delete docker-compose.override.yml, or DM Forge will not start.
+services:
+  dmforge:
+    networks:
+      - default
+      - dmatlas
+networks:
+  dmatlas:
+    external: true
+    name: dmatlas_default

@@ -7,6 +7,12 @@ export const KINDS = { new: 'New', improved: 'Improved', fixed: 'Fixed' };
 
 export const CHANGELOG = [
   {
+    version: '2.58.1', date: '2026-11-23', title: 'DMAtlas on the same server',
+    changes: [
+      ['fixed', 'When DM Forge and DMAtlas run as containers on the same machine, the importer could not reach DMAtlas by its tailnet address (a container is refused there). deploy/docker-compose.dmatlas.yml has DM Forge join DMAtlas\'s Docker network instead and use http://dmatlas:8767; the steps are in deploy/DEPLOY-V3.md. The "cannot reach DMAtlas" message now says this when it recognises the case.'],
+    ],
+  },
+  {
     version: '2.58.0', date: '2026-11-22', title: 'Import dungeons from DMAtlas',
     changes: [
       ['new', 'Import a dungeon from DMAtlas (Maps page, the command palette, or Settings, Data). Pick a published dungeon, read what it will do, and import: one note named after the dungeon in a Dungeons folder, with a section for every room ("## 2.1. The Hall"), and one map note per level with its picture and a pin for every room. Multi-level dungeons keep every level in the same note. The server fetches and checks the pictures itself (a real PNG, no bigger than 15 MB or 16384 pixels, matching the hash DMAtlas gave) and stores them under the campaign\'s Maps folder, so they are in your backups and the Markdown export.'],

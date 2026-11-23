@@ -101,9 +101,23 @@ It prints `OK. N published dungeons:` and lists them, or says exactly why not.
 Pictures are fetched by the server, checked (a real PNG, no larger than 15 MB or 16384 pixels, and exactly the hash DMAtlas gave) and stored under
 `<campaign>/Maps/<dungeon>/`. They are in the nightly Markdown export and the database backups. Nothing else is fetched, and redirects are never followed.
 
-**If the check says it cannot reach DMAtlas:** a container does not always see the tailnet (names like `water.tail029b78.ts.net` may not resolve inside it).
-The ways round it, in order of tidiness: put DMAtlas and DM Forge on one Docker network and use DMAtlas's container address (`http://dmatlas:<its port>`),
-or publish DMAtlas on the Docker bridge address only (never `0.0.0.0`) and use that. Tell Claude what the check printed and it will say which fits.
+**If DMAtlas runs as a container on this same machine** (it does, here): a container cannot use DMAtlas's tailnet address (`https://<machine>.<tailnet>.ts.net:8767`).
+Tailscale only opens that port to other devices, so from inside the container it is refused. Instead, DM Forge joins DMAtlas's Docker network and uses its container name:
+
+```
+cd ~/dmforge
+cp deploy/docker-compose.dmatlas.yml docker-compose.override.yml
+sed -i '/^DMFORGE_DMATLAS_URL=/d' .env
+echo 'DMFORGE_DMATLAS_URL=http://dmatlas:8767' >> .env
+docker compose up -d
+docker compose exec dmforge python -I dmforge_atlas.py
+```
+
+`docker compose` reads `docker-compose.override.yml` by itself, and it is not in the repository, so the automatic updater leaves it alone. The network name inside it
+(`dmatlas_default`) and the port (`8767`) come from `docker ps` and `docker inspect dmatlas`; change them if yours differ. Nothing is published beyond loopback.
+If you ever remove DMAtlas or its network, delete `docker-compose.override.yml` or DM Forge will not start.
+
+**If DMAtlas is somewhere else** (another machine on the tailnet), the tailnet address works as it is, because then the request does come from outside.
 
 ## Backups
 

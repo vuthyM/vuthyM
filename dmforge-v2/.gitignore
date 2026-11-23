@@ -8,3 +8,4 @@ __pycache__/
 update.log
 .update.lock
 .update.bad
+docker-compose.override.yml

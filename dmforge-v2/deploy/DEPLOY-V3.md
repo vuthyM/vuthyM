@@ -117,6 +117,9 @@ docker compose exec dmforge python -I dmforge_atlas.py
 (`dmatlas_default`) and the port (`8767`) come from `docker ps` and `docker inspect dmatlas`; change them if yours differ. Nothing is published beyond loopback.
 If you ever remove DMAtlas or its network, delete `docker-compose.override.yml` or DM Forge will not start.
 
+**If the check says `DMAtlas answered 421`:** DMAtlas only accepts its own public host name (a guard like DM Forge's own). DM Forge tries your tailnet name and `localhost`
+by itself and tells you which one worked; to make it permanent, put `DMFORGE_DMATLAS_HOST=<that name>` in `.env` and run `docker compose up -d`.
+
 **If DMAtlas is somewhere else** (another machine on the tailnet), the tailnet address works as it is, because then the request does come from outside.
 
 ## Backups

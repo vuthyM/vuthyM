@@ -427,7 +427,7 @@ def start_nightly(data_dir, export_dir, hour, keep, stop):
     return t
 
 
-def make_server(data_dir, app_path, bind='127.0.0.1', port=8765, name='DM Forge', hosts=(), token=None, verbose=False, dmatlas_url=''):
+def make_server(data_dir, app_path, bind='127.0.0.1', port=8765, name='DM Forge', hosts=(), token=None, verbose=False, dmatlas_url='', dmatlas_host=''):
     State.store = Store(os.path.join(data_dir, 'dmforge.db'))
     State.token = token or load_token(data_dir)[0]
     State.session = session_value(State.token)
@@ -436,7 +436,7 @@ def make_server(data_dir, app_path, bind='127.0.0.1', port=8765, name='DM Forge'
     State.hosts = tuple(h.strip().lower() for h in hosts if h.strip())
     State.verbose = verbose
     State.fails = {}
-    State.atlas = Atlas(dmatlas_url)
+    State.atlas = Atlas(dmatlas_url, host=dmatlas_host or os.environ.get('DMFORGE_DMATLAS_HOST', ''))
     srv = ThreadingHTTPServer((bind, port), Handler)
     srv.daemon_threads = True
     return srv

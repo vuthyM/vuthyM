@@ -16,6 +16,7 @@ services:
       DMFORGE_NAME: "${DMFORGE_NAME:-DM Forge}"
       DMFORGE_HOSTS: "${DMFORGE_HOSTS:-}"
       DMFORGE_DMATLAS_URL: "${DMFORGE_DMATLAS_URL-https://water.tail029b78.ts.net:8767}"      # where DMAtlas publishes dungeons (see deploy/DEPLOY-V3.md); set it empty in .env to switch the importer off
+      DMFORGE_DMATLAS_HOST: "${DMFORGE_DMATLAS_HOST:-}"     # only if DMAtlas insists on one host name (it answers 421 otherwise); empty tries your tailnet name and localhost by itself
       DMFORGE_EXPORT_DIR: /export
       DMFORGE_BACKUP_HOUR: "${DMFORGE_BACKUP_HOUR:-3}"
       DMFORGE_BACKUP_KEEP: "${DMFORGE_BACKUP_KEEP:-14}"

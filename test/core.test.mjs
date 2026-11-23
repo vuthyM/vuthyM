@@ -3738,3 +3738,42 @@ test('palettes: the active-page text (accent nudged toward the text colour) stay
     assert.ok(contrast(ink, tint) >= 4.5, p.id + ' ' + m + ' on ' + under + ': ' + contrast(ink, tint).toFixed(2));
   }
 });
+
+
+/* ---------- 2.60: pushing for me, and reading the server's report ---------- */
+import { autoPushCheck } from '../src/core/push.js';
+import { bytesText, agoText, inText, serverWarning } from '../src/core/serverinfo.js';
+test('auto-push goes ahead for plain edits, new notes and moves', () => {
+  assert.deepEqual(autoPushCheck([{ path: 'a.md', kind: 'update', conflict: null, merged: null }]), { ok: true, reason: '' });
+  assert.equal(autoPushCheck([{ path: 'a.md', kind: 'create', conflict: null }]).ok, true);
+  const move = [{ path: 'old.md', kind: 'delete', movedTo: 'new.md' }, { path: 'new.md', kind: 'create', movedFrom: 'old.md', conflict: null }];
+  assert.equal(autoPushCheck(move).ok, true);
+});
+test('auto-push waits when a note changed elsewhere, was merged, or would be deleted', () => {
+  assert.deepEqual(autoPushCheck([{ path: 'a.md', kind: 'update', conflict: 'changed' }]), { ok: false, reason: 'conflict' });
+  assert.equal(autoPushCheck([{ path: 'a.md', kind: 'update', conflict: null, merged: 'x' }]).reason, 'conflict');
+  assert.equal(autoPushCheck([{ path: 'a.md', kind: 'create', conflict: 'exists' }]).reason, 'conflict');
+  assert.equal(autoPushCheck([{ path: 'a.md', kind: 'update' }, { path: 'b.md', kind: 'delete' }]).reason, 'delete');
+  assert.equal(autoPushCheck([]).reason, 'nothing');
+});
+test('sizes and times in words', () => {
+  assert.equal(bytesText(500), '500 bytes'); assert.equal(bytesText(2048), '2 KB'); assert.equal(bytesText(5 * 1024 ** 2), '5.0 MB'); assert.equal(bytesText(3 * 1024 ** 3), '3.0 GB'); assert.equal(bytesText(40 * 1024 ** 3), '40 GB');
+  const now = 1_000_000_000_000;
+  assert.equal(agoText(0, now), 'never'); assert.equal(agoText(now - 5000, now), 'just now'); assert.equal(agoText(now - 600000, now), '10 min ago'); assert.equal(agoText(now - 5 * 3600000, now), '5 h ago'); assert.equal(agoText(now - 3 * 86400000, now), '3 days ago'); assert.equal(agoText(now - 86400000, now), '1 day ago');
+  assert.equal(inText(now + 45 * 60000, now), '45 min'); assert.equal(inText(now + 7 * 3600000, now), '7 h');
+});
+test('the server report says what needs a look, and nothing when all is well', () => {
+  const now = 1_000_000_000_000, GB = 1024 ** 3;
+  const good = { notes: 50, up_hours: 100, disk: { free: 50 * GB, total: 100 * GB }, backup: { last: { ok: true, at: now - 3600000 } }, update: { state: 'ok', version: '2.60.0' }, checked_at: now - 30000, hold_until: 0 };
+  assert.equal(serverWarning(good, now), '');
+  assert.equal(serverWarning(null, now), '');
+  assert.match(serverWarning({ ...good, disk: { free: GB, total: 100 * GB } }, now), /low on disk/);
+  assert.match(serverWarning({ ...good, disk: { free: 5 * GB, total: 100 * GB } }, now), /low on disk/);   // 5% free is low even with 5 GB
+  assert.match(serverWarning({ ...good, backup: { last: { ok: false, at: now } } }, now), /backup failed/);
+  assert.match(serverWarning({ ...good, backup: { last: { ok: true, at: now - 40 * 3600000 } } }, now), /no nightly backup for over a day/);
+  assert.match(serverWarning({ ...good, backup: { last: null } }, now), /no nightly backup yet/);
+  assert.equal(serverWarning({ ...good, backup: { last: null }, up_hours: 5 }, now), '');           // a brand new server has had no night yet
+  assert.match(serverWarning({ ...good, update: { state: 'failed', version: '2.61.0' } }, now), /2\.61\.0.*old version/);
+  assert.match(serverWarning({ ...good, checked_at: now - 20 * 60000 }, now), /20 minutes/);
+  assert.equal(serverWarning({ ...good, checked_at: now - 20 * 60000, hold_until: now + 3600000 }, now), '');      // on hold: not looking is the point
+});

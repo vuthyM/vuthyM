@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- Pulls a copy of the DM Forge campaign to this Mac every day at 11:20. If the Mac is asleep then, it runs when it wakes.
+     Setup: see "Off-site copies" in deploy/DEPLOY-V3.md. Replace YOURNAME and the address, then:
+       cp tools/com.dmforge.pull-backup.plist ~/Library/LaunchAgents/ && launchctl load ~/Library/LaunchAgents/com.dmforge.pull-backup.plist -->
+<plist version="1.0">
+<dict>
+  <key>Label</key><string>com.dmforge.pull-backup</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/bin/bash</string>
+    <string>/Users/YOURNAME/dmforge/tools/pull-backup.sh</string>
+    <string>https://YOUR-SERVER.YOUR-TAILNET.ts.net</string>
+  </array>
+  <key>StartCalendarInterval</key><dict><key>Hour</key><integer>11</integer><key>Minute</key><integer>20</integer></dict>
+  <key>StandardOutPath</key><string>/Users/YOURNAME/Library/Logs/dmforge-pull-backup.log</string>
+  <key>StandardErrorPath</key><string>/Users/YOURNAME/Library/Logs/dmforge-pull-backup.log</string>
+</dict>
+</plist>

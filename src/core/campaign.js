@@ -4,6 +4,12 @@ import { TYPES, OTHER, getField, fieldDefs, typeInfo } from './schema.js';
 
 /* Reads every file in the campaign folder (recursively, skipping dot-folders). */
 export async function loadCampaign(vault, path, onProgress) {
+  if (vault.beginBulk) await vault.beginBulk();
+  try { return await readCampaign(vault, path, onProgress); }
+  finally { if (vault.endBulk) vault.endBulk(); }
+}
+
+async function readCampaign(vault, path, onProgress) {
   const files = [];
   const md = [];
   const dirs = [];

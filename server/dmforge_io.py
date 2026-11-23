@@ -16,8 +16,11 @@ export  writes every note (and imported file) as plain files into a folder, so y
 Standard library only.
 """
 import argparse
+import gzip
 import json
 import os
+import shutil
+import sqlite3
 import sys
 import time
 
@@ -137,18 +140,93 @@ def export_folder(store, dest):
     return {'written': written, 'same': same, 'removed': removed, 'notes': len(live)}
 
 
+STATUS_FILE = 'status.json'
+
+
+def read_status(data_dir):
+    try:
+        with open(os.path.join(data_dir, STATUS_FILE), 'r', encoding='utf-8') as f:
+            d = json.load(f)
+        return d if isinstance(d, dict) else {}
+    except (OSError, ValueError):
+        return {}
+
+
+def record_status(data_dir, key, value):
+    """Remembers the outcome of a background job (the nightly backup) where the app's Server page can show it."""
+    d = read_status(data_dir)
+    d[key] = value
+    tmp = os.path.join(data_dir, STATUS_FILE + '.part')
+    with open(tmp, 'w', encoding='utf-8') as f:
+        json.dump(d, f)
+    os.replace(tmp, os.path.join(data_dir, STATUS_FILE))
+
+
+def verify_backup(path, expect_files):
+    """Opens a database copy on its own and checks it: SQLite's own check, and every note and picture is there. -> None, or why not."""
+    try:
+        db = sqlite3.connect('file:%s?mode=ro&immutable=1' % path, uri=True)
+        try:
+            if db.execute('PRAGMA quick_check').fetchone()[0] != 'ok':
+                return 'the copy did not pass SQLite\'s own check'
+            n = db.execute('SELECT COUNT(*) FROM files WHERE is_dir=0').fetchone()[0]
+        finally:
+            db.close()
+    except sqlite3.Error as e:
+        return 'the copy cannot be opened (%s)' % e
+    if n != expect_files:
+        return 'the copy holds %d files but the database holds %d' % (n, expect_files)
+    return None
+
+
+def backup_files(data_dir):
+    """Every database copy kept: [(name, bytes)], newest first by name."""
+    bdir = os.path.join(data_dir, 'backups')
+    out = []
+    try:
+        for n in os.listdir(bdir):
+            if n.endswith('.db') or n.endswith('.db.gz'):
+                try:
+                    out.append((n, os.path.getsize(os.path.join(bdir, n))))
+                except OSError:
+                    pass
+    except OSError:
+        pass
+    return sorted(out, reverse=True)
+
+
 def nightly(store, data_dir, export_dir=None, keep=14):
-    """One backup round: a consistent database copy (keeping the newest `keep`), and the Markdown export."""
+    """One backup round: a consistent database copy that is checked and compressed (keeping the newest `keep`), and the Markdown export.
+    The outcome, good or bad, is recorded for the app's Server page."""
     res = {}
     bdir = os.path.join(data_dir, 'backups')
     stamp = time.strftime('%Y%m%d-%H%M%S')
-    res['backup'] = os.path.basename(store.backup_to(os.path.join(bdir, 'dmforge-%s.db' % stamp)))
-    olds = sorted(n for n in os.listdir(bdir) if n.startswith('dmforge-') and n.endswith('.db'))
-    for n in olds[:-keep] if keep > 0 else []:
+    plain = os.path.join(bdir, 'dmforge-%s.db' % stamp)
+    try:
+        store.backup_to(plain)
+        problem = verify_backup(plain, store.db.execute('SELECT COUNT(*) FROM files WHERE is_dir=0').fetchone()[0])
+        if problem:
+            os.unlink(plain)
+            raise RuntimeError('the backup was made but is not good: ' + problem)
+        gz = plain + '.gz'
+        with open(plain, 'rb') as src, gzip.open(gz + '.part', 'wb', compresslevel=6) as dst:
+            shutil.copyfileobj(src, dst, 1 << 20)
+        os.replace(gz + '.part', gz)
+        os.unlink(plain)
+        res['backup'] = os.path.basename(gz)
+        names = sorted((n for n in os.listdir(bdir) if n.startswith('dmforge-') and (n.endswith('.db') or n.endswith('.db.gz'))))
+        for n in names[:-keep] if keep > 0 else []:
+            try:
+                os.unlink(os.path.join(bdir, n))
+            except OSError:
+                pass
+        record_status(data_dir, 'backup', {'at': int(time.time() * 1000), 'ok': True, 'file': res['backup'], 'bytes': os.path.getsize(gz), 'verified': True})
+    except Exception as e:
         try:
-            os.unlink(os.path.join(bdir, n))
+            record_status(data_dir, 'backup', {'at': int(time.time() * 1000), 'ok': False, 'error': str(e)[:200]})
         except OSError:
             pass
+        raise
     if export_dir:
         res['export'] = export_folder(store, export_dir)
     return res

@@ -7,6 +7,12 @@ export const KINDS = { new: 'New', improved: 'Improved', fixed: 'Fixed' };
 
 export const CHANGELOG = [
   {
+    version: '2.60.1', date: '2026-11-26', title: 'Typing spots on the Locations lines',
+    changes: [
+      ['fixed', 'In the Session prep template the Locations lines ("Place:") had nowhere to click and type, unlike the State tracker and MUST HAPPEN lines, so they only looked finished. A bullet that is only a label (it ends in a colon, with nothing after it) now has the same dashed spot after the label. Click it, type, and the text is saved on that line after the label; Enter adds the next line. This also covers the NPC card lines ("Voice/mannerisms:", "Look:" and so on), the dungeon template\'s "Hours spent:" and any note of yours that has such lines. A line that introduces a nested list, or that already has text after its label, is left as it was.'],
+    ],
+  },
+  {
     version: '2.60.0', date: '2026-11-23', title: 'The Server page, and a copy you can take away',
     changes: [
       ['new', 'Settings, Server (V3): the server\'s own report in one place. The last nightly backup (when, how big, and whether it was checked), the last update and when the server last looked for one, free disk space, the size of the database, how many notes and pictures there are. If something needs a look (a failed backup, no backup for a day and a half, low disk space, an update that did not install, the server not looking for updates), the top bar says "Server needs a look" and the page says what.'],

@@ -3777,3 +3777,18 @@ test('the server report says what needs a look, and nothing when all is well', (
   assert.match(serverWarning({ ...good, checked_at: now - 20 * 60000 }, now), /20 minutes/);
   assert.equal(serverWarning({ ...good, checked_at: now - 20 * 60000, hold_until: now + 3600000 }, now), '');      // on hold: not looking is the point
 });
+
+
+/* ---------- a label with nothing after it still has a spot to click (Locations in the Session prep template) ---------- */
+test('a bullet that is only a label gets a click spot after it; ordinary bullets and lines that introduce a list do not', () => {
+  const body = ['- **Place:** ', '- **Place:** ', '- Torches / light:', '- [ ] Hours spent:', '- A normal bullet', '- **Name:** Mira', '- Ingredients:', '    - eel', ''].join('\n');
+  const r = buildBlocks(body, body);
+  assert.ok(r.ok);
+  const html = r.blocks.map(renderBlock).join('');
+  const slots = (html.match(/<span class="u-empty">/g) || []).length;
+  assert.equal(slots, 4);                                           // the two Places, Torches / light, Hours spent
+  assert.match(html, /<span class="u" data-u="\d+"><strong>Place:<\/strong> <span class="u-empty">/);
+  assert.doesNotMatch(html, /A normal bullet <span class="u-empty"/);
+  assert.doesNotMatch(html, /Mira[^<]*<span class="u-empty"/);
+  assert.doesNotMatch(html, /Ingredients:\s*<span class="u-empty"/);
+});

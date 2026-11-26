@@ -11,6 +11,8 @@ import { Marked } from 'marked';
    Callout lines start with "> "; that prefix is kept for you and added back when you save. */
 
 const QUOTE = /^ {0,3}>[ \t]?/;
+/* a bullet that ends in a colon (the colon may be inside bold): a label waiting for its answer */
+const LABEL_ONLY = /:(?:\*\*|__)?$/;
 const LEAD = /^(\s*(?:[-*+]|\d+[.)])[ \t]+)(?:\[([ xX])\][ \t]?)?/;      // "  - ", "1. ", and an optional "[ ] "
 
 const esc = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
@@ -24,6 +26,7 @@ const md = new Marked({
     listitem(item) {
       if (item._u === undefined) return false;
       let box = '', span = '', rest = '', own = true;
+      const kids = item.tokens.some(t => t.type === 'list');       // a line that introduces a nested list is not waiting to be filled in
       for (const tok of item.tokens) {
         if (tok.type === 'checkbox') {
           const name = String(item.text || '').replace(/\[\[([^\]|]+)(?:\|([^\]]+))?\]\]/g, (m, a, b) => b || a).replace(/[*_`#>\[\]]/g, '').replace(/\s+/g, ' ').trim().slice(0, 120) || 'task';
@@ -34,7 +37,9 @@ const md = new Marked({
           own = false;
           const inner = this.parser.parseInline(tok.tokens || [{ type: 'text', raw: tok.text, text: tok.text, escaped: true }]);
           const empty = !String(tok.text || '').replace(/[\s\u200b]/g, '');
-          const sp = '<span class="u' + (empty ? ' u-empty' : '') + '" data-u="' + item._u + '">' + inner + '</span>';
+          // a line that is only a label ("- **Place:** ", "- Torches / light:") still gets a spot to click after it, like an empty checkbox line does
+          const slot = !empty && !kids && LABEL_ONLY.test(String(tok.text || '').trim()) ? (/\s$/.test(inner) ? '' : ' ') + '<span class="u-empty">\u200b</span>' : '';
+          const sp = '<span class="u' + (empty ? ' u-empty' : '') + '" data-u="' + item._u + '">' + inner + slot + '</span>';
           span = tok.type === 'paragraph' ? '<p>' + sp + '</p>\n' : sp;
           continue;
         }

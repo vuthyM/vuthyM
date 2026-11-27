@@ -18,7 +18,7 @@ export const S = {
   islandPin: false, accent: 'gold', sbOpen: false, live: '', undo: null, updating: false, updateLater: '',   // installing it now / the version you chose "Not now" for
   lastTouch: 0, lastSync: 0, serverInfo: null, serverWarn: '',   // last edit (ms), last time other devices' changes were checked, the server's status and what needs attention in it (hosted only)
   newVersion: '',         // set when the helper has installed a different version than this page is running
-  settings: { leaveEdit: 'auto', trackLeftOff: true, autoOpenLast: true, sidebarAuto: false, sidebarDelay: 2000, groupAfter: 20, leftOffKeep: 20, cheatStars: [], hiddenGens: [], recentGens: [], combos: STARTER_COMBOS, inspireStrength: 'strong', neglectAfter: 3, srdOn: true, darkStyle: 'warm', palette: 'tide', autoPush: false, autoPushMins: 10 },   // see ui/settings.jsx; remembered in the browser
+  settings: { leaveEdit: 'auto', trackLeftOff: true, autoOpenLast: true, sidebarAuto: false, sidebarDelay: 2000, groupAfter: 20, leftOffKeep: 20, cheatStars: [], hiddenGens: [], recentGens: [], combos: STARTER_COMBOS, inspireStrength: 'strong', neglectAfter: 3, srdOn: true, darkStyle: 'warm', palette: 'tide', autoPush: false, autoPushMins: 10, ideasSaveSecs: 30 },   // see ui/settings.jsx; remembered in the browser
   leftOff: {},            // per session note: its last changes, newest first ("where you left off")
   job: null,              // a Claude job running in the background (the campaign snapshot): { kind, status: running | ready | failed, label, started, ... }
   cheatOpen: false,       // the DM cheat sheet slide-over

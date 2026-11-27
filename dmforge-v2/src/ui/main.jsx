@@ -8,6 +8,7 @@ import { ThemeToggle } from './theme.jsx';
 import { Welcome, FolderBrowser, Loading, MappingScreen, Inspector } from './screens.jsx';
 import { Shell } from './shell.jsx';
 import { LibraryScreen } from './library.jsx';
+import { IdeasScreen } from './ideas.jsx';
 import * as L from './libraryactions.js';
 import { Toasts } from './common.jsx';
 import { FsaVault, MemoryVault } from '../core/vault.js';
@@ -37,6 +38,7 @@ function App() {
     case 'inspect': screen = <Inspector />; break;
     case 'app': screen = <Shell />; break;
     case 'library': screen = <LibraryScreen />; break;
+    case 'ideas': screen = <IdeasScreen />; break;
     default: screen = <Welcome />;
   }
   return <>{screen}{s.screen !== 'app' && <ThemeToggle floating />}<Toasts /></>;

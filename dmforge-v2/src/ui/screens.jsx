@@ -7,6 +7,7 @@ import { scanVault, buildReport } from '../core/inspector.js';
 import { FsaVault, MemoryVault } from '../core/vault.js';
 import { demoFiles, DEMO_VAULT_NAME } from '../core/demo.js';
 import { openLibrary } from './libraryactions.js';
+import { openWorkshop } from './ideasactions.js';
 
 function Brand() {
   return (
@@ -98,7 +99,7 @@ export function FolderBrowser() {
     <div class="center-screen">
       <div class="panel wide stack">
         <Brand />
-        <div class="row-actions" style="justify-content:space-between;align-items:center;margin-top:8px"><h3 style="margin:0">Choose the campaign folder</h3><button class="btn btn-sm" id="openLibrary" title="Make player characters and NPCs that belong to no campaign" onClick={() => openLibrary('browse')}>Character Library</button></div>
+        <div class="row-actions" style="justify-content:space-between;align-items:center;margin-top:8px"><h3 style="margin:0">Choose the campaign folder</h3><span class="row-actions" style="gap:8px"><button class="btn btn-sm" id="openWorkshop" title="Write one-shots and campaign ideas, apart from any campaign" onClick={() => openWorkshop('browse')}>Workshop</button><button class="btn btn-sm" id="openLibrary" title="Make player characters and NPCs that belong to no campaign" onClick={() => openLibrary('browse')}>Character Library</button></span></div>
         <p class="muted small" style="margin:0">Pick the folder that holds one campaign (its NPCs, players, sessions…). DM Forge only writes inside it.</p>
         <div class="crumbs">
           <button onClick={() => setCwd('')}>{vault.name}</button>

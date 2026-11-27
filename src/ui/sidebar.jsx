@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'preact/hooks';
 import { S, set, useApp, getIndex } from './store.js';
 import { setSection, goto, openTab, wantsNewTab, claudeOn, isFav, toggleFav, moveFav, updateSetting, currentSessionPath } from './actions.js';
 import { openLibrary } from './libraryactions.js';
+import { openWorkshop } from './ideasactions.js';
 import { TYPES, TYPE_ORDER, OTHER, isCustom, typeLabel } from '../core/schema.js';
 import { IMAGE_EXT, ext } from '../core/util.js';
 import { Icon } from './icons.jsx';
@@ -172,6 +173,7 @@ export function Sidebar({ reload, leave, onNavigate }) {
         })}
         <div class="nav-sep" />
         <button class="nav-btn" id="navCharacters" title="Your Character Library: characters that belong to no campaign" onClick={() => { openLibrary('app'); if (onNavigate) onNavigate(); }}><Icon name="id" /><span class="nav-label">Characters</span><span class="nav-hint">library</span></button>
+        <button class="nav-btn" id="navWorkshop" title="The Workshop: one-shots and campaign ideas, apart from any campaign" onClick={() => { openWorkshop('app'); if (onNavigate) onNavigate(); }}><Icon name="wand" /><span class="nav-label">Workshop</span></button>
       </nav>
       <div class="side-foot">
         <button class="nav-btn" id="navSettings" onClick={() => set({ dialog: { kind: 'menu' } })}><Icon name="gear" /><span class="nav-label">Menu</span>{claudeOn() && <span class="badge">Claude on</span>}</button>

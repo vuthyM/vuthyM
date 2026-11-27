@@ -3,6 +3,7 @@ import { S, useApp, getIndex, set, toast } from './store.js';
 import { Modal } from './common.jsx';
 import { openSettings, goto, setSection, openTab, openAssetTab, createNote, setDiceOpen, setLogOpen, timerOpen, toggleCheat, startPush, startTour, toggleTheme, setLayout, checkForUpdate, wantsNewTab, duplicateNote, askUndoPush, tableMode, toggleLive, liveTarget, currentSessionPath, setAccent } from './actions.js';
 import { openLibrary } from './libraryactions.js';
+import { openWorkshop } from './ideasactions.js';
 import { ACCENTS } from '../core/accent.js';
 import { search } from '../core/campaign.js';
 import { typeInfo } from '../core/schema.js';
@@ -24,6 +25,7 @@ function actions(idx, q) {
     { id: 'cheat', label: 'DM cheat sheet', words: 'cheat sheet rules quick reference', run: () => toggleCheat(true) },
     { id: 'push', label: 'Push changes', words: 'push save write publish', run: () => startPush() },
     { id: 'monsters', label: 'Monster library', words: 'monsters creatures bestiary stat block new custom monster', run: () => set({ dialog: { kind: 'monsters' } }) },
+    { id: 'workshop', label: 'Workshop (ideas and one-shots)', words: 'workshop ideas one-shot oneshot brainstorm write adventure plan', run: () => openWorkshop('app') },
     { id: 'library', label: 'Character Library', words: 'characters library creator level up items', run: () => openLibrary('app') },
     { id: 'theme', label: 'Switch light and dark', words: 'theme dark light mode', run: () => toggleTheme() },
     { id: 'settings', label: 'Settings', words: 'settings preferences options', run: () => openSettings() },

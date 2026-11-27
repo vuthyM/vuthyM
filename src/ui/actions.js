@@ -1026,6 +1026,7 @@ function cleanSettings(o) {
   if (o && PALETTE_IDS.includes(o.palette)) out.palette = o.palette;
   if (o && typeof o.autoPush === 'boolean') out.autoPush = o.autoPush;
   if (o && [5, 10, 20, 30].includes(o.autoPushMins)) out.autoPushMins = o.autoPushMins;
+  if (o && [15, 30, 60].includes(o.ideasSaveSecs)) out.ideasSaveSecs = o.ideasSaveSecs;
   if (o && Array.isArray(o.recentGens)) out.recentGens = [...new Set(o.recentGens.filter(x => typeof x === 'string' && x.length < 40))].slice(0, 6);
   return out;
 }

@@ -181,6 +181,10 @@ function useItems() {
       sub={S.hosted && S.settings.autoPush ? <div class="so-sub"><label class="so-inline">After <select id="setAutoPushMins" aria-label="Quiet minutes before pushing" value={String(S.settings.autoPushMins || 10)} onChange={e => updateSetting('autoPushMins', Number(e.currentTarget.value))}>{[5, 10, 20, 30].map(m => <option key={m} value={String(m)}>{m} minutes</option>)}</select> without an edit</label></div> : null}>
       <Switch id="setAutoPush" checked={!!S.settings.autoPush && S.hosted} label="Push for me when I stop" onChange={v => updateSetting('autoPush', v)} />
     </Row>));
+  add('writing', 'ideassave', 'How often the Workshop saves', 'workshop ideas save autosave seconds minute lag one-shot', (
+    <Row key="ideassave" id="ideassave" title="How often the Workshop saves" desc="An idea saves on this device as you type, and goes to the server on this timer, when you leave the page and when the page is hidden. A longer wait keeps typing smooth on a slow connection.">
+      <select id="setIdeasSave" aria-label="Seconds between saves" value={String(S.settings.ideasSaveSecs || 30)} onChange={e => updateSetting('ideasSaveSecs', Number(e.currentTarget.value))}>{[[15, 'Every 15 seconds'], [30, 'Every 30 seconds'], [60, 'Every minute']].map(([v, l]) => <option key={v} value={String(v)}>{l}</option>)}</select>
+    </Row>));
   add('writing', 'autoopen', 'Open the campaign I was last in', 'start startup launch campaign list resume', (
     <Row key="autoopen" id="autoopen" title="Open the campaign I was last in" desc="Skips the campaign list when DM Forge starts. Switch campaign still takes you to the list.">
       <Switch id="setAutoOpen" label="Open the campaign I was last in" checked={st.autoOpenLast !== false} onChange={v => updateSetting('autoOpenLast', v)} />

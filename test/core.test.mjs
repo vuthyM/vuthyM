@@ -3792,3 +3792,181 @@ test('a bullet that is only a label gets a click spot after it; ordinary bullets
   assert.doesNotMatch(html, /Mira[^<]*<span class="u-empty"/);
   assert.doesNotMatch(html, /Ingredients:\s*<span class="u-empty"/);
 });
+
+
+/* ---------- the Workshop: ideas are plain notes ---------- */
+import { parseIdea, serializeIdea, blankIdea, newRow, summarize as summarizeIdea, filterShelf, ideaPath, SECTIONS } from '../src/core/ideas.js';
+const IDEA = `---
+type: idea
+status: developing
+pitch: A ferry that never arrives
+tone: Gothic comedy
+players: 4
+level: 3
+tags: [boats, horror]
+aliases: [Drowned Bell]
+---
+# The Drowned Bell
+
+Loose thoughts before any heading.
+
+## The idea
+A village pays the river to keep quiet.
+
+## Hook
+The ferry stops short of the dock.
+
+## NPCs
+- **Mira Voss** — wants: the ledger · secret: she sold the map · voice: dry, never blinks
+- **Old Tam** — rows the river at night
+- a bare line with no name
+
+## Locations
+- **The Weir** — where the bell went down
+  with a second line of detail
+
+## Scenes
+1. **Arrival** — the ferry stops
+2. **The Weir** — they dive
+
+## Endings
+- **If they ring it:** the Choir wakes
+
+## A heading I made myself
+Keep this exactly.
+`;
+test('an idea note is read into sections, rows and settings, and unknown things are kept', () => {
+  const m = parseIdea(IDEA, 'file name');
+  assert.equal(m.title, 'The Drowned Bell');
+  assert.deepEqual([m.status, m.pitch, m.tone, m.players, m.level, m.tags], ['developing', 'A ferry that never arrives', 'Gothic comedy', '4', '3', ['boats', 'horror']]);
+  assert.match(m.sec.idea, /^Loose thoughts before any heading\.\n\nA village pays the river/);
+  assert.equal(m.sec.hook, 'The ferry stops short of the dock.');
+  assert.deepEqual(m.sec.cast.map(r => [r.name, r.wants, r.secret, r.voice]), [['Mira Voss', 'the ledger', 'she sold the map', 'dry, never blinks'], ['Old Tam', 'rows the river at night', '', ''], ['', 'a bare line with no name', '', '']]);
+  assert.deepEqual(m.sec.places.map(r => [r.name, r.note]), [['The Weir', 'where the bell went down\nwith a second line of detail']]);
+  assert.deepEqual(m.sec.scenes.map(r => r.name), ['Arrival', 'The Weir']);
+  assert.equal(m.sec.endings[0].name, 'If they ring it:');
+  assert.deepEqual(m.extras.map(e => [e.title, e.body]), [['A heading I made myself', 'Keep this exactly.']]);
+});
+test('writing an idea back keeps unknown front matter and headings, and reading it again gives the same idea', () => {
+  const m = parseIdea(IDEA, 'x');
+  const out = serializeIdea(m);
+  assert.match(out, /aliases: \[Drowned Bell\]/);
+  assert.match(out, /## A heading I made myself\n\nKeep this exactly\.\n$/);
+  assert.match(out, /type: idea/);
+  const again = parseIdea(out, 'x');
+  const strip = o => JSON.parse(JSON.stringify(o, (k, v) => (k === '_id' || k === 'base' ? undefined : v)));
+  assert.deepEqual(strip(again), strip(m));
+  assert.equal(serializeIdea(again), out);                       // and it is stable: writing twice changes nothing
+});
+test('an idea with Windows line endings stays that way', () => {
+  const crlf = IDEA.replace(/\n/g, '\r\n');
+  const out = serializeIdea(parseIdea(crlf, 'x'));
+  assert.ok(out.includes('\r\n') && !/[^\r]\n/.test(out));
+});
+test('a new idea writes every section but the optional Maps, and empty rows are not written', () => {
+  const m = blankIdea('Night Market');
+  m.sec.cast.push(newRow('cast', { name: 'Zed', wants: 'a debt paid · today' }), newRow('cast'));
+  m.sec.scenes.push(newRow('scenes', { name: 'Open', note: 'line one\nline two' }), newRow('scenes'));
+  m.sec.hook = '\n\nSmoke on the water.  \n';
+  m.tags = ['market'];
+  m.players = '5';
+  const out = serializeIdea(m);
+  for (const s of SECTIONS.filter(s => !s.optional)) assert.ok(out.includes('## ' + s.title + '\n'), s.title);
+  assert.ok(!out.includes('## Maps'));
+  assert.match(out, /- \*\*Zed\*\* — wants: a debt paid \/ today\n/);          // " · " inside a field would split the row, so it is swapped
+  assert.match(out, /1\. \*\*Open\*\* — line one\n  line two\n/);
+  assert.match(out, /## Hook\n\nSmoke on the water\.\n/);
+  assert.match(out, /players: 5\n/);
+  assert.equal((out.match(/^- /gm) || []).length, 1);
+  const back = parseIdea(out, 'x');
+  assert.equal(back.sec.scenes[0].note, 'line one\nline two');
+  assert.equal(back.sec.scenes.length, 1);
+});
+test('a note that was never made in the Workshop still opens, with its file name as the title', () => {
+  const m = parseIdea('Just a paragraph about a haunted mill.\n', 'Haunted Mill');
+  assert.equal(m.title, 'Haunted Mill');
+  assert.equal(m.status, 'spark');
+  assert.equal(m.sec.idea, 'Just a paragraph about a haunted mill.');
+  assert.match(serializeIdea(m), /^---\ntype: idea\nstatus: spark\n---\n# Haunted Mill\n/);
+});
+test('the shelf: summaries, search and order', () => {
+  const a = summarizeIdea('Ideas/A.md', IDEA);
+  assert.deepEqual([a.title, a.status, a.cast, a.places, a.scenes, a.endings], ['The Drowned Bell', 'developing', 3, 1, 2, 1]);
+  const b = summarizeIdea('Ideas/B.md', '---\nstatus: spark\ntags: [heist]\n---\n# Zed\n');
+  const c = summarizeIdea('Ideas/C.md', '---\nstatus: played\n---\n# Alpha\n');
+  assert.deepEqual(filterShelf([c, b, a], '', '').map(x => x.title), ['The Drowned Bell', 'Zed', 'Alpha']);
+  assert.deepEqual(filterShelf([c, b, a], 'heist', '').map(x => x.title), ['Zed']);
+  assert.deepEqual(filterShelf([c, b, a], '', 'played').map(x => x.title), ['Alpha']);
+  assert.equal(ideaPath('Night: Market?'), 'Ideas/Night Market.md');
+});
+
+
+/* ---------- the Workshop's spark tools and the ready-to-run checklist ---------- */
+import { SPARKS, PROMPTS, promptFor, readiness, rollGen } from '../src/core/ideaspark.js';
+test('every spark rolls something sensible, many times over, with the section\'s own fields', () => {
+  for (const [sec, sparks] of Object.entries(SPARKS)) {
+    const def = SECTIONS.find(s => s.id === sec);
+    assert.ok(def, sec);
+    for (const sp of sparks) {
+      for (let i = 0; i < 60; i++) {
+        const r = sp.run();
+        const flat = JSON.stringify(r);
+        assert.ok(!/undefined|NaN|\[object|null/.test(flat), sec + '/' + sp.id + ': ' + flat);
+        if (def.kind === 'rows') {
+          assert.ok(Array.isArray(r.rows) && r.rows.length >= 1, sec + '/' + sp.id);
+          for (const row of r.rows) {
+            assert.ok(Object.keys(row).every(k => def.fields.includes(k)), sec + '/' + sp.id + ' has a field the section does not: ' + Object.keys(row));
+            assert.ok(Object.values(row).some(v => String(v).trim()), sec + '/' + sp.id + ' rolled an empty row');
+          }
+        } else assert.ok(typeof r.text === 'string' && r.text.trim().length > 5, sec + '/' + sp.id + ': ' + flat);
+      }
+    }
+  }
+});
+test('rolled text is in metric, like the Generate screen', () => {
+  const all = [];
+  for (const sparks of Object.values(SPARKS)) for (const sp of sparks) for (let i = 0; i < 40; i++) all.push(JSON.stringify(sp.run()));
+  assert.ok(!all.some(t => /\b\d+[- ]?(feet|foot|ft|miles?|pounds?|lbs?)\b/.test(t)));
+});
+test('a rolled idea survives being written and read again', () => {
+  const m = blankIdea('Rolled');
+  for (const [sec, sparks] of Object.entries(SPARKS)) {
+    const def = SECTIONS.find(s => s.id === sec);
+    for (const sp of sparks) { const r = sp.run(); if (r.rows) for (const row of r.rows) m.sec[sec].push(newRow(sec, row)); else m.sec[sec] = (m.sec[sec] ? m.sec[sec] + '\n\n' : '') + r.text; }
+  }
+  const out = serializeIdea(m);
+  const back = parseIdea(out, 'x');
+  for (const def of SECTIONS.filter(s => s.kind === 'rows')) assert.equal(back.sec[def.id].length, m.sec[def.id].length, def.id);
+  assert.equal(serializeIdea(back), out);
+});
+test('prompts exist for every section and cycle', () => {
+  for (const s of SECTIONS) assert.ok(PROMPTS[s.id] && PROMPTS[s.id].length >= 1 || s.id === 'maps', s.id);
+  assert.notEqual(promptFor('cast', 0), promptFor('cast', 1));
+  assert.equal(promptFor('cast', 0), promptFor('cast', PROMPTS.cast.length));
+  assert.equal(promptFor('cast', -1), PROMPTS.cast[PROMPTS.cast.length - 1]);
+  assert.equal(promptFor('nope', 0), '');
+});
+test('the ready-to-run checklist', () => {
+  const m = blankIdea('Check');
+  let r = readiness(m);
+  assert.equal(r.done, 0); assert.equal(r.ready, false); assert.equal(r.total, 8);
+  m.pitch = 'A ferry that never arrives';
+  m.sec.hook = 'The ferry stops short of the dock and the ferryman asks for names.';
+  m.sec.cast.push(newRow('cast', { name: 'Mira', wants: 'the ledger' }), newRow('cast', { name: 'Tam', secret: 'he drowned him' }), newRow('cast', { name: 'Calder' }));
+  r = readiness(m);
+  assert.equal(r.checks.find(c => c.id === 'cast').ok, true);
+  assert.equal(r.checks.find(c => c.id === 'wants').ok, false);                  // Calder wants nothing yet
+  m.sec.cast[2].wants = 'the bell rung';
+  m.sec.places.push(newRow('places', { name: 'The Weir' }), newRow('places', { name: 'The Inn' }));
+  m.sec.scenes.push(newRow('scenes', { name: 'a' }), newRow('scenes', { name: 'b' }), newRow('scenes', { name: 'c' }));
+  m.sec.stakes = 'They lose the village if the bell rings at midnight.';
+  assert.equal(readiness(m).ready, false);                                       // no ending yet
+  m.sec.endings.push(newRow('endings', { name: 'If they ring it', note: 'the Choir wakes' }));
+  r = readiness(m);
+  assert.equal(r.ready, true); assert.equal(r.done, 8);
+  assert.deepEqual([r.extras, r.extrasTotal], [0, 3]);
+  m.sec.twists.push(newRow('twists', { name: 'x' })); m.players = '4'; m.level = '3'; m.sec.endings.push(newRow('endings', { name: 'y' }));
+  assert.equal(readiness(m).extras, 3);
+  m.sec.cast.length = 0;
+  assert.equal(readiness(m).ready, false);
+});

@@ -4,11 +4,17 @@ import { S, useApp } from './store.js';
 import { Icon } from './icons.jsx';
 import { PopMenu } from './popmenu.jsx';
 import { Dialogs } from './dialogs.jsx';
+import { Modal } from './common.jsx';
+import { promotePlan } from '../core/ideapromote.js';
+import { today } from '../core/util.js';
+import { renderMarkdown } from './render.js';
 import { SECTIONS, STATUSES, statusOf, filterShelf } from '../core/ideas.js';
 import { SPARKS, promptFor, readiness } from '../core/ideaspark.js';
 import {
   closeWorkshop, ideasSet, createIdea, openIdea, backToShelf, toggleSection, setField, setSecText, setRowField, setExtra, addRow, removeRow, moveRow, removeExtra,
   setStatus, setTags, saveNow, resolveIdeaConflict, askDeleteIdea, duplicateIdea, onIdeaStatus, rollInto, appendText, useReadyStatus,
+  openPromote, promoteSet, closePromote, runPromote, openCampaignOf,
+  runStart, runStop, sceneKey, runToggleDone, runSetCurrent, runStep, runToggleOpen, runSize, runReset, runOpenFromShelf, runFinish,
 } from './ideasactions.js';
 
 const agoText = ms => {
@@ -39,7 +45,7 @@ export function IdeasScreen() {
   const s = useApp();
   const I = s.ideas;
   if (!I) return null;
-  return <div class="ideas" id="ideas">{I.view === 'page' && I.model ? <IdeaPage I={I} /> : <Shelf I={I} />}<Dialogs /></div>;
+  return <div class="ideas" id="ideas">{I.view === 'page' && I.model ? (I.run ? <RunSheet I={I} /> : <IdeaPage I={I} />) : <Shelf I={I} />}<Dialogs />{I.promote && <PromoteDialog I={I} />}</div>;
 }
 
 /* ================================================================ the shelf */
@@ -97,6 +103,7 @@ function Shelf({ I }) {
               <button class="idea-card-main" onClick={() => openIdea(c.path)} aria-label={'Open ' + c.title}>
                 <div class="idea-card-top">
                   <span class={'idea-status st-' + c.status}>{statusOf(c.status).label}</span>
+                  {c.campaign && <span class="idea-tag" title={'Became the campaign ' + c.campaign}>Campaign</span>}
                   {I.drafts && I.drafts.has(c.path) && <span class="idea-unsaved" title="Changes on this device that have not reached the server yet">Not saved to the server</span>}
                 </div>
                 <div class="idea-card-title">{c.title}</div>
@@ -112,6 +119,7 @@ function Shelf({ I }) {
               <PopMenu id={'ideaMenu' + ci} title="More for this idea" btnClass="tb-icon idea-card-more">
                 {({ close }) => <>
                   <button class="pop-item" role="menuitem" onClick={() => { close(); openIdea(c.path); }}>Open</button>
+                  <button class="pop-item" role="menuitem" data-act="run" onClick={() => { close(); runOpenFromShelf(c.path); }}>Run it</button>
                   <button class="pop-item" role="menuitem" data-act="copy" onClick={() => { close(); duplicateIdea(c.path); }}>Make a copy</button>
                   <button class="pop-item danger" role="menuitem" data-act="delete" onClick={() => { close(); askDeleteIdea(c.path, c.title); }}>Delete…</button>
                 </>}
@@ -191,6 +199,8 @@ function IdeaPage({ I }) {
         <button class="btn btn-sm" id="ideaToShelf" onClick={backToShelf}>← Workshop</button>
         <SaveChip />
         <span class="spacer" style="flex:1" />
+        <button class="btn btn-sm" id="ideaRun" onClick={runStart} title="Big text, scene by scene, for running it at the table">Run it</button>
+        <button class="btn btn-sm btn-primary" id="ideaPromote" onClick={openPromote} title="Make a campaign folder from this idea: the first session, a note for each NPC and place, and the main plot thread">Make it a campaign…</button>
         <PopMenu id="ideaMenuPage" title="More for this idea" btnClass="tb-icon">
           {({ close }) => <>
             <button class="pop-item" role="menuitem" id="ideaDup" onClick={() => { close(); duplicateIdea(I.path); }}>Make a copy</button>
@@ -199,6 +209,7 @@ function IdeaPage({ I }) {
         </PopMenu>
       </div>
       <Conflict I={I} />
+      {m.campaign && <div class="idea-note" id="ideaCampaign">This idea became the campaign <b>{m.campaign}</b>. <button class="linkish" id="ideaOpenCampaign" onClick={() => openCampaignOf(m.campaign)}>Open it</button></div>}
       {I.msg && !I.conflict && <div class="idea-note" id="ideaMsg" role="status">{I.msg}</div>}
       <div class="idea-layout">
         <Outline I={I} defs={defs} />
@@ -351,6 +362,164 @@ function Row({ def, row, index, last }) {
         <button class="tb-icon" title="Move up" aria-label="Move up" disabled={index === 0} onClick={() => moveRow(def.id, row, -1)}><span aria-hidden="true">↑</span></button>
         <button class="tb-icon" title="Move down" aria-label="Move down" disabled={last} onClick={() => moveRow(def.id, row, 1)}><span aria-hidden="true">↓</span></button>
         <button class="tb-icon" title="Remove" aria-label="Remove" data-remove onClick={() => removeRow(def.id, row)}><Icon name="x" size={15} /></button>
+      </div>
+    </div>
+  );
+}
+
+/* ================================================================ turning it into a campaign */
+const KIND_LABEL = { overview: 'Campaign overview', session: 'Session 1 (the prep)', npc: 'NPC', place: 'Place', thread: 'Plot thread' };
+function PromoteDialog({ I }) {
+  const P = I.promote;
+  const plan = promotePlan(I.model, Object.assign({ date: today() }, P));
+  const group = k => plan.files.filter(f => f.kind === k);
+  if (P.done) {
+    return (
+      <Modal title="Your campaign is ready" onClose={closePromote} focusFirst={false}>
+        <div id="promoteDone">
+          <p>Made <b>{P.done.written}</b> notes in <b>{P.done.folder}</b>. The idea is still in the Workshop, and now says which campaign it became.</p>
+          <div class="row-actions" style="gap:8px;margin-top:12px;justify-content:flex-end">
+            <button class="btn" id="promoteStay" onClick={closePromote}>Stay in the Workshop</button>
+            <button class="btn btn-primary" id="promoteOpen" onClick={() => { closePromote(); openCampaignOf(P.done.folder); }}>Open the campaign</button>
+          </div>
+        </div>
+      </Modal>
+    );
+  }
+  return (
+    <Modal title="Make it a campaign" onClose={closePromote} wide>
+      <div id="promoteForm" class="stack">
+        <p class="muted small" style="margin:0">This writes a new campaign folder from the idea. The idea itself is not changed, apart from noting which campaign it became.</p>
+        <label>Campaign folder
+          <input id="promoteFolder" type="text" value={P.folder} onInput={e => promoteSet({ folder: e.currentTarget.value })} />
+        </label>
+        <div class="promote-opts">
+          <label class="check"><input type="checkbox" id="promoteNpcs" checked={P.npcs} onChange={e => promoteSet({ npcs: e.currentTarget.checked })} /> A note for each NPC <span class="muted small">({group('npc').length || plan.counts.npcs})</span></label>
+          <label class="check"><input type="checkbox" id="promotePlaces" checked={P.places} onChange={e => promoteSet({ places: e.currentTarget.checked })} /> A note for each place</label>
+          <label class="check"><input type="checkbox" id="promoteThread" checked={P.thread} onChange={e => promoteSet({ thread: e.currentTarget.checked })} /> The main plot thread</label>
+          <label class="check"><input type="checkbox" id="promotePlayed" checked={P.played} onChange={e => promoteSet({ played: e.currentTarget.checked })} /> Mark the idea as Played</label>
+        </div>
+        <div class="promote-plan" id="promotePlan">
+          <b>{plan.files.length} notes will be made in {plan.folder || '…'}:</b>
+          <ul>
+            {plan.files.map(f => <li key={f.path}><span class="muted small">{KIND_LABEL[f.kind]}</span> {f.path.slice(plan.folder.length + 1)}</li>)}
+          </ul>
+        </div>
+        {(P.err || plan.problems[0]) && <div class="idea-warn" id="promoteErr" role="alert">{P.err || plan.problems[0]}</div>}
+        <div class="row-actions" style="gap:8px;justify-content:flex-end">
+          <button class="btn" id="promoteCancel" onClick={closePromote}>Cancel</button>
+          <button class="btn btn-primary" id="promoteGo" disabled={P.busy || !!plan.problems.length} onClick={runPromote}>{P.busy ? 'Making…' : 'Make the campaign'}</button>
+        </div>
+      </div>
+    </Modal>
+  );
+}
+
+/* ================================================================ the run sheet */
+function Md({ text }) { return <div class="md run-md" dangerouslySetInnerHTML={{ __html: renderMarkdown(String(text || '')) }} />; }
+const filledRow = r => Object.entries(r).some(([k, v]) => k !== '_id' && String(v).trim());
+
+/* big, calm, read-only: where you are in the scenes, what is open, and what is ticked stay on this device */
+function RunSheet({ I }) {
+  const m = I.model, R = I.run;
+  const scenes = m.sec.scenes.filter(filledRow);
+  const open = (id, def) => (R.open[id] === undefined ? def : R.open[id]);
+  useEffect(() => {
+    const k = e => {
+      const t = e.target && e.target.tagName;
+      if (t === 'INPUT' || t === 'TEXTAREA' || t === 'SELECT' || e.metaKey || e.ctrlKey || e.altKey || S.dialog) return;
+      if (e.key === 'ArrowRight' || e.key === 'n') { e.preventDefault(); runStep(1); }
+      else if (e.key === 'ArrowLeft' || e.key === 'p') { e.preventDefault(); runStep(-1); }
+      else if (e.key === 'Escape') runStop();
+    };
+    window.addEventListener('keydown', k);
+    return () => window.removeEventListener('keydown', k);
+  }, []);
+  const folds = [
+    { id: 'cast', title: 'Cast', def: true, rows: m.sec.cast.filter(filledRow), kind: 'cast' },
+    { id: 'places', title: 'Places', def: false, rows: m.sec.places.filter(filledRow) },
+    { id: 'twists', title: 'Twists and secrets', def: false, rows: m.sec.twists.filter(filledRow) },
+    { id: 'endings', title: 'Endings', def: true, rows: m.sec.endings.filter(filledRow) },
+    { id: 'monsters', title: 'Monsters and encounters', def: false, rows: m.sec.monsters.filter(filledRow) },
+  ];
+  const texts = [
+    { id: 'rewards', title: 'Rewards', def: false }, { id: 'props', title: 'Props, handouts and music', def: false },
+    { id: 'maps', title: 'Maps', def: false }, { id: 'notes', title: 'Other notes', def: false },
+  ].filter(t => String(m.sec[t.id] || '').trim());
+  const doneN = scenes.filter((r, i) => R.done[sceneKey(r, i)]).length;
+  return (
+    <div class={'ideas-wrap run-wrap run-size-' + R.size} id="runSheet">
+      <div class="ideas-top run-top">
+        <button class="btn btn-sm" id="runBack" onClick={runStop}>← Back to the idea</button>
+        <span class="run-title">{m.title}</span>
+        <span class="spacer" style="flex:1" />
+        {scenes.length > 0 && <span class="muted small" id="runProgress">Scene {Math.min(R.cur + 1, scenes.length)} of {scenes.length} · {doneN} done</span>}
+        <span class="run-size-btns" role="group" aria-label="Text size">
+          <button class="btn btn-sm" id="runSmaller" aria-label="Smaller text" disabled={R.size === 0} onClick={() => runSize(-1)}>A−</button>
+          <button class="btn btn-sm" id="runBigger" aria-label="Bigger text" disabled={R.size === 2} onClick={() => runSize(1)}>A+</button>
+        </span>
+      </div>
+      {m.pitch && <p class="run-pitch">{m.pitch}</p>}
+      {String(m.sec.hook || '').trim() && (
+        <section class="run-sec run-hook" id="run-hook"><h3>Hook</h3><Md text={m.sec.hook} /></section>
+      )}
+      {scenes.length > 0 && (
+        <section class="run-sec" id="run-scenes">
+          <div class="run-sec-head"><h3>Scenes</h3><button class="linkish" id="runReset" onClick={runReset}>Start over</button></div>
+          <div class="run-scenes">
+            {scenes.map((r, i) => {
+              const key = sceneKey(r, i), done = !!R.done[key], cur = i === R.cur;
+              return (
+                <div key={r._id} id={'run-scene-' + i} class={'run-scene' + (cur ? ' cur' : '') + (done ? ' done' : '')} data-scene={i}>
+                  <button class="run-check" role="checkbox" aria-checked={done} aria-label={'Done: ' + (r.name || 'scene ' + (i + 1))} onClick={() => runToggleDone(key)}>{done ? '✓' : ''}</button>
+                  <button class="run-scene-body" onClick={() => runSetCurrent(i)} aria-current={cur ? 'step' : undefined}>
+                    <span class="run-scene-n">{i + 1}</span>
+                    <span class="run-scene-name">{r.name}</span>
+                    {r.note && <span class="run-scene-note">{r.note}</span>}
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+          <div class="run-nav">
+            <button class="btn" id="runPrev" disabled={R.cur <= 0} onClick={() => runStep(-1)}>◂ Previous</button>
+            <button class="btn btn-primary" id="runNext" disabled={R.cur >= scenes.length - 1 && !!R.done[sceneKey(scenes[scenes.length - 1], scenes.length - 1)]} onClick={() => runStep(1)}>{R.cur >= scenes.length - 1 ? 'Finish the last scene' : 'Done, next scene ▸'}</button>
+            <span class="muted small">Arrow keys work too.</span>
+          </div>
+        </section>
+      )}
+      {String(m.sec.stakes || '').trim() && <section class="run-sec run-stakes" id="run-stakes"><h3>Stakes, goals and the clock</h3><Md text={m.sec.stakes} /></section>}
+      {folds.filter(f => f.rows.length).map(f => (
+        <section class="run-sec" key={f.id} id={'run-' + f.id}>
+          <button class="run-fold" aria-expanded={open(f.id, f.def)} onClick={() => runToggleOpen(f.id, f.def)}><Icon name="chev" size={16} /><h3>{f.title}</h3><span class="muted small">{f.rows.length}</span></button>
+          {open(f.id, f.def) && (
+            <div class="run-cards">
+              {f.rows.map(r => f.kind === 'cast' ? (
+                <div class="run-card" key={r._id}>
+                  <div class="run-card-name">{r.name || 'Unnamed'}</div>
+                  {r.wants && <div><b>Wants</b> {r.wants}</div>}
+                  {r.secret && <div class="run-secret"><b>Secret</b> {r.secret}</div>}
+                  {r.voice && <div class="muted"><b>Voice and look</b> {r.voice}</div>}
+                </div>
+              ) : (
+                <div class="run-card" key={r._id}>
+                  {r.name && <div class="run-card-name">{r.name}</div>}
+                  {r.note && <div class="run-card-note">{r.note}</div>}
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
+      ))}
+      {texts.map(t => (
+        <section class="run-sec" key={t.id} id={'run-' + t.id}>
+          <button class="run-fold" aria-expanded={open(t.id, t.def)} onClick={() => runToggleOpen(t.id, t.def)}><Icon name="chev" size={16} /><h3>{t.title}</h3></button>
+          {open(t.id, t.def) && <Md text={m.sec[t.id]} />}
+        </section>
+      ))}
+      <div class="run-end">
+        {m.status !== 'played' ? <button class="btn btn-primary" id="runFinish" onClick={runFinish}>That is the end: mark it as Played</button> : <span class="muted" id="runPlayed">Marked as Played.</span>}
+        <button class="btn" id="runEdit" onClick={runStop}>Back to the idea</button>
       </div>
     </div>
   );

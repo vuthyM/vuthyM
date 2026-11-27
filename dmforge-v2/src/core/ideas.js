@@ -69,7 +69,7 @@ export const newRow = (sec, init = {}) => {
 export function blankIdea(title = '') {
   const sec = {};
   for (const s of SECTIONS) sec[s.id] = s.kind === 'rows' ? [] : '';
-  return { title, status: 'spark', pitch: '', tone: '', length: '', players: '', level: '', tags: [], sec, extras: [], base: '', eol: '\n' };
+  return { title, status: 'spark', pitch: '', tone: '', length: '', players: '', level: '', tags: [], campaign: '', sec, extras: [], base: '', eol: '\n' };
 }
 
 /* ---------------------------------------------------------------- reading */
@@ -130,6 +130,7 @@ export function parseIdea(text, fallbackTitle = '') {
   idea.length = fm.length == null ? '' : String(fm.length);
   idea.players = fm.players == null ? '' : String(fm.players);
   idea.level = fm.level == null ? '' : String(fm.level);
+  idea.campaign = fm.campaign == null ? '' : String(fm.campaign);
   idea.tags = Array.isArray(fm.tags) ? fm.tags.map(String) : typeof fm.tags === 'string' ? fm.tags.split(/[,\s]+/).filter(Boolean) : [];
   const lines = sp.body.replace(/\r\n/g, '\n').split('\n');
   let i = 0;
@@ -169,6 +170,8 @@ export function parseIdea(text, fallbackTitle = '') {
 
 /* ---------------------------------------------------------------- writing */
 
+/* between a bold name and its note: a dash, unless the name already ends in punctuation ("If they ring it:") */
+export const sepAfter = name => (/[:.?!…]$/.test(String(name).trim()) ? ' ' : ' — ');
 const oneLine = s => String(s == null ? '' : s).replace(/\s*\n\s*/g, ' ').replace(/ · /g, ' / ').trim();
 
 function rowLines(sec, rows) {
@@ -192,7 +195,7 @@ function rowLines(sec, rows) {
     n++;
     const bullet = def.order ? n + '. ' : '- ';
     const noteLines = note.split('\n');
-    const first = (name ? '**' + name + '**' : '') + (name && noteLines[0] ? ' — ' : '') + noteLines[0];
+    const first = (name ? '**' + name + '**' : '') + (name && noteLines[0] ? sepAfter(name) : '') + noteLines[0];
     out.push(bullet + first);
     for (const l of noteLines.slice(1)) out.push(l.trim() ? '  ' + l : '');
   }
@@ -224,6 +227,7 @@ export function serializeIdea(idea) {
     type: 'idea', status: idea.status || 'spark',
     pitch: oneLine(idea.pitch) || undefined, tone: oneLine(idea.tone) || undefined, length: oneLine(idea.length) || undefined,
     players: num(idea.players), level: num(idea.level), tags: idea.tags && idea.tags.length ? idea.tags : undefined,
+    campaign: idea.campaign ? idea.campaign : undefined,
   });
   const text = fm + body;
   return idea.eol === '\r\n' ? text.replace(/\r?\n/g, '\r\n') : text;
@@ -238,7 +242,7 @@ export function summarize(path, text) {
   const m = parseIdea(text, stem(path));
   const count = id => (m.sec[id] || []).filter(r => r.name || r.note || r.wants).length;
   const words = Object.values(m.sec).reduce((n, v) => n + (typeof v === 'string' ? (v.match(/\S+/g) || []).length : v.reduce((k, r) => k + Object.entries(r).reduce((a, [key, val]) => a + (key === '_id' ? 0 : (String(val).match(/\S+/g) || []).length), 0), 0)), 0);
-  return { path, title: m.title || stem(path), status: m.status, pitch: m.pitch, tone: m.tone, length: m.length, players: m.players, level: m.level, tags: m.tags,
+  return { path, title: m.title || stem(path), status: m.status, pitch: m.pitch, tone: m.tone, length: m.length, players: m.players, level: m.level, tags: m.tags, campaign: m.campaign,
     cast: count('cast'), places: count('places'), scenes: count('scenes'), endings: count('endings'), words };
 }
 

@@ -360,6 +360,22 @@ nightly plain-Markdown copy of the whole campaign, and the app keeps working wit
 the server will not overwrite a note that changed since you started). Everything about setting it up is in `deploy/DEPLOY-V3.md`;
 the plan and what is still to come are in `V3-PLAN.md`. The server can install new releases by itself (`update.sh`, checked every minute, with a database copy first and an automatic roll back). The server limits wrong-token guesses (the right token is never locked out), drops stalled connections, sends the app compressed, and if it stalls the app opens from its saved copy and carries on offline. **Settings, Server** (V3 only) shows the last backup (checked and compressed every night), the last update, free disk space and what this device has saved for offline; it also holds updates for 8 hours before a session, downloads a copy of the whole campaign, and (off by default) can push your edits for you after a quiet spell. `tools/pull-backup.sh` keeps a copy on your Mac. The Mac helper and folder mode are unchanged.
 
+## The Workshop (ideas and one-shots)
+
+A place to write one-shots and campaign ideas, apart from any campaign. Open it from the sidebar (**Workshop**), the command palette, or the **Workshop** button on the folder picker.
+It works the same on the server (V3) and on the Mac version: an idea is one Markdown note in an `Ideas` folder at the top of your vault, like the Character Library.
+
+- **The shelf:** one card per idea (status, pitch, tone, length, players, level, tags, and counts of NPCs, places, scenes and endings). Search, filter by status, make a copy, delete (to the trash).
+- **The page:** the idea, hook, cast, places, scenes, stakes and the clock, twists, endings, monsters, rewards, props and music, maps (optional), other notes. Anything else in the note is kept as written.
+- **Saving:** every key is kept on this device at once, and the idea is saved to the vault every 15 or 30 seconds, or each minute (Settings, Writing and saving), when you leave the page and when the page is hidden.
+  With no connection it stays on this device and goes when the server is back. If the idea changed elsewhere, you choose: keep mine, use the other, or keep both. Nothing is overwritten, and on the server every save is a version in the history.
+- **Roll one:** each section has a button that rolls with the Generate tools and adds it under what you wrote. A blank section offers a question.
+- **Ready to run?** A checklist that follows your writing and offers to mark the idea Ready to run.
+- **Make it a campaign:** shows every note it will make (overview, session 1 prep as callouts, NPC and place notes, the main plot thread), refuses a folder that already has things in it, and opens the campaign.
+- **Run it:** big text, read-only, scene by scene, with arrow keys and A−/A+. Your place is kept on the device. Mark it Played at the end.
+
+Core logic: `src/core/ideas.js` (reading and writing the note), `ideaspark.js`, `ideapromote.js`; the screen: `src/ui/ideas.jsx`, `ideasactions.js`.
+
 ## Dungeons from DMAtlas
 
 On the server (V3), **Maps, Import from DMAtlas…** (also the command palette, and Settings, Data) brings a dungeon over from DMAtlas. DMAtlas keeps the geometry (the picture,

@@ -19,7 +19,7 @@ const sentence = s => (s ? String(s).replace(/[.!?]+$/, '') + '.' : '');
 /* Each spark: { id, label, run() -> { rows: [{...fields}] } or { text } }. Rows use the section's own field names. */
 export const SPARKS = {
   idea: [
-    { id: 'premise', label: 'A premise to start from', run: () => {
+    { id: 'premise', label: 'A premise', run: () => {
       const v = rollGen('villain'), h = rollGen('hook'), p = rollGen('settlement');
       return { text: sentence(h.hook) + ' ' + v.name + ' wants to ' + String(v.goal || '').toLowerCase().replace(/\.$/, '') + ', in ' + p.name + ' (' + String(p.known || '').toLowerCase() + ').' };
     } },

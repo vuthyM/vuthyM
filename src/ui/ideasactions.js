@@ -6,7 +6,9 @@
    If it was changed somewhere else in the meantime, nothing is overwritten: you choose. */
 import { S, set, emit, toast } from './store.js';
 import { idbGet, idbSet, idbDel, idbKeys } from '../core/idb.js';
-import { stem } from '../core/util.js';
+import { stem, today, sanitizeName } from '../core/util.js';
+import { promotePlan, PROMOTE_MAPPING } from '../core/ideapromote.js';
+import { chooseCampaign } from './actions.js';
 import { IDEAS_FOLDER, blankIdea, parseIdea, serializeIdea, listIdeas, ideaPath, freeTitle, newRow, SECTION_BY_ID } from '../core/ideas.js';
 import { SPARKS } from '../core/ideaspark.js';
 
@@ -318,3 +320,80 @@ export function rollInto(secId, sparkId) {
   if (I) { I.rolled = (I.rolled || 0) + 1; }
 }
 export function useReadyStatus() { setStatus('ready'); toast('Marked as Ready to run.'); }
+
+
+/* ---------------------------------------------------------------- turning it into a campaign */
+export function openPromote() {
+  const I = S.ideas;
+  if (!I || !I.model) return;
+  I.promote = { folder: sanitizeName(I.model.title) || 'New campaign', npcs: true, places: true, thread: true, played: false, busy: false, err: '', done: null };
+  emit();
+}
+export function promoteSet(patch) { const I = S.ideas; if (I && I.promote) { Object.assign(I.promote, patch, { err: '' }); emit(); } }
+export function closePromote() { const I = S.ideas; if (I) { I.promote = null; emit(); } }
+export const promoteNow = () => { const I = S.ideas; return I && I.model && I.promote ? promotePlan(I.model, Object.assign({ date: today() }, I.promote)) : null; };
+
+export async function runPromote() {
+  const I = S.ideas, P = I && I.promote;
+  if (!P || !I.model || P.busy) return;
+  const plan = promotePlan(I.model, Object.assign({ date: today() }, P));
+  if (plan.problems.length) { P.err = plan.problems[0]; emit(); return; }
+  P.busy = true; P.err = ''; emit();
+  let n = 0;
+  try {
+    if (!(await S.vault.ensureWrite())) throw new Error('Write permission for the folder was not granted.');
+    let there = [];
+    try { there = await S.vault.list(plan.folder); } catch (e) { there = []; }
+    if (there && there.length) throw new Error('There is already a folder called “' + plan.folder + '” with things in it. Choose another name so nothing is overwritten.');
+    for (const f of plan.files) { await S.vault.writeText(f.path, f.text); n++; }
+    try { await idbSet('mapping|' + S.vaultKey + '|' + plan.folder, PROMOTE_MAPPING); } catch (e) { /* storage unavailable: the app will ask how to sort the folders */ }
+    ideaEdit(m => { m.campaign = plan.folder; if (P.played) m.status = 'played'; }, { render: false });
+    await saveNow();
+    P.done = { folder: plan.folder, written: n };
+  } catch (e) {
+    P.err = (n ? 'Stopped after ' + n + ' of ' + plan.files.length + ' notes: ' : '') + errMsg(e);
+  }
+  P.busy = false;
+  emit();
+}
+
+/* open the campaign an idea became (the idea is saved first) */
+export async function openCampaignOf(folder) {
+  const I = S.ideas;
+  if (!folder) return;
+  if (I && I.model) await leaveIdea(true);
+  S.ideas = null;
+  await chooseCampaign(folder);
+}
+
+
+/* ---------------------------------------------------------------- the run sheet (big text for the table) */
+const runKey = () => 'dmforge:ideas-run|' + S.vaultKey + '|' + (S.ideas ? S.ideas.path : '');
+const loadRun = () => { try { return JSON.parse(localStorage.getItem(runKey()) || '{}') || {}; } catch (e) { return {}; } };
+const saveRun = r => { try { localStorage.setItem(runKey(), JSON.stringify(r)); } catch (e) { /* storage unavailable: it is only where you are up to */ } };
+export function runStart() {
+  const I = S.ideas; if (!I || !I.model) return;
+  const r = loadRun();
+  I.run = { done: r.done || {}, cur: Number.isInteger(r.cur) ? r.cur : 0, open: r.open || {}, size: [0, 1, 2].includes(r.size) ? r.size : 1 };
+  emit();
+  window.scrollTo({ top: 0 });
+}
+export function runStop() { const I = S.ideas; if (I) { I.run = null; emit(); window.scrollTo({ top: 0 }); } }
+const persistRun = () => { const I = S.ideas; if (I && I.run) saveRun({ done: I.run.done, cur: I.run.cur, open: I.run.open, size: I.run.size }); };
+export const sceneKey = (r, i) => i + ':' + String(r.name || '').trim().slice(0, 40);
+export function runToggleDone(key) { const R = S.ideas.run; R.done = Object.assign({}, R.done, { [key]: !R.done[key] }); persistRun(); emit(); }
+export function runSetCurrent(i) { const R = S.ideas.run; R.cur = i; persistRun(); emit(); }
+export function runStep(dir) {
+  const I = S.ideas; if (!I || !I.run || !I.model) return;
+  const scenes = I.model.sec.scenes.filter(r => Object.entries(r).some(([k, v]) => k !== '_id' && String(v).trim()));
+  const R = I.run;
+  if (dir > 0 && scenes[R.cur]) R.done = Object.assign({}, R.done, { [sceneKey(scenes[R.cur], R.cur)]: true });
+  R.cur = Math.max(0, Math.min(scenes.length - 1, R.cur + dir));
+  persistRun(); emit();
+  const el = document.getElementById('run-scene-' + R.cur); if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+export function runToggleOpen(id, def) { const R = S.ideas.run; const now = R.open[id] === undefined ? def : R.open[id]; R.open = Object.assign({}, R.open, { [id]: !now }); persistRun(); emit(); }
+export function runSize(d) { const R = S.ideas.run; R.size = Math.max(0, Math.min(2, R.size + d)); persistRun(); emit(); }
+export function runReset() { const R = S.ideas.run; R.done = {}; R.cur = 0; persistRun(); emit(); }
+export async function runOpenFromShelf(path) { await openIdea(path); if (S.ideas && S.ideas.model) runStart(); }
+export function runFinish() { setStatus('played'); toast('Marked as Played.'); }

@@ -3970,3 +3970,82 @@ test('the ready-to-run checklist', () => {
   m.sec.cast.length = 0;
   assert.equal(readiness(m).ready, false);
 });
+
+
+/* ---------- the Workshop: turning an idea into a campaign ---------- */
+import { promotePlan, prepText, PROMOTE_MAPPING } from '../src/core/ideapromote.js';
+import { parseNote as parseNoteP } from '../src/core/markdown.js';
+function richIdea() {
+  const m = parseIdea(IDEA, 'x');
+  m.sec.stakes = 'They want to leave before the frost.';
+  m.sec.twists.push(newRow('twists', { name: 'The ferryman', note: 'is the first bellringer' }));
+  m.sec.monsters.push(newRow('monsters', { name: '3 drowned cultists', note: 'in the Weir' }));
+  m.sec.rewards = 'A bell-wax candle.';
+  m.players = '4'; m.level = '3';
+  return m;
+}
+test('the plan makes an overview, a first session, a note per NPC and place, and a plot thread', () => {
+  const m = richIdea();
+  const p = promotePlan(m, { folder: 'Drowned Bell', date: '2026-12-01' });
+  assert.deepEqual(p.problems, []);
+  const paths = p.files.map(f => f.path).sort();
+  assert.deepEqual(paths, ['Drowned Bell/Drowned Bell.md', 'Drowned Bell/Locations/The Weir.md', 'Drowned Bell/NPCs/Mira Voss.md', 'Drowned Bell/NPCs/Old Tam.md', 'Drowned Bell/Plot Threads/The Drowned Bell.md', 'Drowned Bell/Sessions/2026-12-01 Session 1.md']);
+  assert.deepEqual(p.counts, { npcs: 2, places: 1, thread: 1 });                // the cast row with no name has no note of its own (its text stays in the session prep)
+});
+test('the session prep is callouts a DM can run from, and every link in it has a note behind it', () => {
+  const m = richIdea();
+  const p = promotePlan(m, { folder: 'DB', date: '2026-12-01' });
+  const session = p.files.find(f => f.kind === 'session').text;
+  assert.match(session, /^---\nnumber: 1\ndate: 2026-12-01\nfrom_idea: "The Drowned Bell"\n---\n\n# Session 1: The Drowned Bell\n\n## Prep\n\n/);
+  assert.match(session, /> \[!important\]\+ Hook \(the first five minutes\)\n> \n> The ferry stops short of the dock\./);
+  assert.match(session, /> \[!abstract\]\+ Scenes and plot points\n> \n> 1\. \*\*Arrival\*\*: the ferry stops\n> 2\. \*\*The Weir\*\*: they dive/);
+  assert.match(session, /> \[!danger\]\+ Stakes, goals and the clock\n> \n> They want to leave before the frost\./);
+  assert.match(session, /> - \[\[Mira Voss\]\] — \*\*wants\*\* the ledger · \*\*secret\*\* she sold the map/);
+  assert.match(session, /## Recap\n$/);
+  const made = new Set(p.files.map(f => f.path.split('/').pop().replace(/\.md$/, '')));
+  for (const l of session.match(/\[\[([^\]]+)\]\]/g) || []) assert.ok(made.has(l.slice(2, -2)), 'no note for ' + l);
+  const note = parseNoteP('DB/Sessions/2026-12-01 Session 1.md', session);
+  assert.equal(String(note.fm.number), '1');
+  assert.ok(note.links.length >= 3);
+});
+test('the NPC, place and thread notes carry what was written, and the overview carries the rest', () => {
+  const p = promotePlan(richIdea(), { folder: 'DB', date: '2026-12-01' });
+  const by = k => p.files.filter(f => f.kind === k);
+  const mira = by('npc').find(f => /Mira/.test(f.path)).text;
+  assert.match(mira, /^---\nstatus: Alive\nfrom_idea: "The Drowned Bell"\n---\n\n\*\*Wants:\*\* the ledger\n\n\*\*Secret \(DM only\):\*\* she sold the map\n\n\*\*Voice and look:\*\* dry, never blinks\n\n## Session updates\n$/);
+  assert.match(by('place')[0].text, /where the bell went down/);
+  assert.match(by('thread')[0].text, /status: Active[\s\S]*A village pays the river[\s\S]*\*\*At stake:\*\* They want to leave/);
+  const ov = by('overview')[0].text;
+  assert.match(ov, /^# DB\n\nA ferry that never arrives\n\n## The idea/);
+  assert.match(ov, /## Tone and table\n\nTone: Gothic comedy\. Players: 4\. Level: 3\./);
+  assert.match(ov, /## The truth \(DM only\)\n\n- \*\*The ferryman\*\* — is the first bellringer/);
+  assert.match(ov, /## Endings\n\n- \*\*If they ring it:\*\* the Choir wakes/);
+});
+test('the plan can leave out NPC notes, place notes and the thread, and then does not link to them', () => {
+  const p = promotePlan(richIdea(), { folder: 'DB', date: '', npcs: false, places: false, thread: false });
+  assert.deepEqual(p.files.map(f => f.kind).sort(), ['overview', 'session']);
+  const session = p.files.find(f => f.kind === 'session').text;
+  assert.ok(!session.includes('[['), 'no links to notes that are not made');
+  assert.match(session, /> - Mira Voss — \*\*wants\*\*/);
+  assert.match(p.files.find(f => f.kind === 'session').path, /^DB\/Sessions\/Session 1\.md$/);
+});
+test('two NPCs with the same name get their own notes; odd names are made safe; an empty idea still plans', () => {
+  const m = blankIdea('Twins: a "test"');
+  m.sec.cast.push(newRow('cast', { name: 'Ann' }), newRow('cast', { name: 'Ann', wants: 'x' }), newRow('cast', { name: 'A/B: C?' }));
+  const p = promotePlan(m, { folder: 'Twins: a "test"?', date: '2026-01-01' });
+  assert.equal(p.folder, 'Twins a test');
+  assert.deepEqual(p.files.filter(f => f.kind === 'npc').map(f => f.path.split('/').pop()), ['Ann.md', 'Ann 2.md', 'AB C.md']);
+  assert.deepEqual(p.problems, []);
+  assert.ok(promotePlan(blankIdea('Empty'), { folder: 'Empty' }).files.length >= 2);
+  assert.ok(promotePlan(blankIdea('Empty'), { folder: '  ' }).problems.length === 1 || promotePlan(blankIdea('Empty'), { folder: '  ' }).folder === 'Empty');
+  assert.equal(PROMOTE_MAPPING['Plot Threads'], 'plot');
+});
+test('an idea remembers which campaign it became, and nothing else about it changes', () => {
+  const m = parseIdea(IDEA, 'x');
+  const before = serializeIdea(m);
+  m.campaign = 'Drowned Bell';
+  const after = serializeIdea(m);
+  assert.match(after, /campaign: Drowned Bell/);
+  assert.equal(after.replace(/campaign: Drowned Bell\n/, ''), before);
+  assert.equal(parseIdea(after, 'x').campaign, 'Drowned Bell');
+});
